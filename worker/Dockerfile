@@ -1,9 +1,9 @@
 # Use an official Python runtime as a parent image
 FROM python:3.10-slim
 
-# Install FFmpeg (required by both Whisper and MoviePy)
+# Install FFmpeg and build dependencies for confluent-kafka
 RUN apt-get update && \
-    apt-get install -y ffmpeg libsm6 libxext6 && \
+    apt-get install -y ffmpeg libsm6 libxext6 gcc librdkafka-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
