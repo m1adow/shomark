@@ -1,0 +1,3 @@
+include:
+  - ollama/docker-compose.yaml
+  - minio/docker-compose.yaml

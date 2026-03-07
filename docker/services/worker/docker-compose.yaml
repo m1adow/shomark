@@ -1,0 +1,18 @@
+services:
+  worker:
+    build: ../../../worker
+    container_name: worker
+    environment:
+      - PYTHONIOENCODING=utf-8
+      - LANG=C.UTF-8
+    volumes:
+      # Map the current directory on your host to /app in the container
+      - ../../../worker:/app
+    # Optional: If you have an NVIDIA GPU, uncomment the lines below to make Whisper 10x faster
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

@@ -1,0 +1,4 @@
+name: shomark
+include:
+   - infrastructure/docker-compose.yaml
+   - services/docker-compose.yaml
