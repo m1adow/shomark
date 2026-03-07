@@ -1,0 +1,17 @@
+services:
+  ollama:
+      image: ollama/ollama:latest
+      container_name: ollama
+      volumes:
+        - ollama_data:/root/.ollama
+      # If you have a GPU, Ollama should use it too
+      deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: 1
+                capabilities: [gpu]
+
+volumes:
+  ollama_data:

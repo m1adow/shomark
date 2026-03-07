@@ -1,0 +1,1 @@
+https://prompttricks.substack.com/p/make-your-llm-output-json
