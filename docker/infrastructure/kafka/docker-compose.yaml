@@ -3,7 +3,7 @@ services:
     image: apache/kafka:latest
     container_name: kafka
     ports:
-      - "9092:9092"
+      - "${KAFKA_PORT}:9092"
     environment:
       # KRaft configuration (No Zookeeper needed)
       KAFKA_NODE_ID: 1
@@ -28,7 +28,7 @@ services:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     ports:
-      - "8080:8080"
+      - "${KAFKA_UI_PORT}:8080"
     depends_on:
       - kafka
     environment:

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ShoMark.Api/ShoMark.Api.csproj" />
+    <Project Path="src/ShoMark.Application/ShoMark.Application.csproj" />
+    <Project Path="src/ShoMark.Domain/ShoMark.Domain.csproj" />
+    <Project Path="src/ShoMark.Infrastructure/ShoMark.Infrastructure.csproj" />
+  </Folder>
+</Solution>

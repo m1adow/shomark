@@ -1,7 +1,6 @@
 services:
   worker:
     build: ../../../worker
-    container_name: worker
     depends_on:
       - kafka
       - minio
@@ -18,17 +17,17 @@ services:
       - KAFKA_SESSION_TIMEOUT_MS=60000        # 60 seconds heartbeat timeout
       # MinIO
       - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=admin
-      - MINIO_SECRET_KEY=password123
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       # Ollama
       - OLLAMA_URL=http://ollama:11434/api/generate
-      - OLLAMA_MODEL=qwen3:30b-a3b
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
     volumes:
       # Map the current directory on your host to /app in the container
       - ../../../worker:/app
     # Optional: If you have an NVIDIA GPU, uncomment the lines below to make Whisper 10x faster
     deploy:
-      replicas: 3
+      replicas: ${WORKER_REPLICAS}
       resources:
         reservations:
           devices:

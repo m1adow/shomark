@@ -1,0 +1,24 @@
+services:
+  api:
+    build:
+      context: ../../../api
+      dockerfile: Dockerfile
+    container_name: api
+    ports:
+      - "${API_PORT}:8080"
+    depends_on:
+      - kafka
+      - postgres
+      - minio
+      - keycloak
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - Kafka__BootstrapServers=kafka:29092
+      - Kafka__VideoProcessingTopic=video-processing
+      - Kafka__CompletionTopic=video-processing-completed
+      - Kafka__ConsumerGroupId=api-group
+      - Keycloak__Authority=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+      - Keycloak__Audience=${KEYCLOAK_CLIENT_ID}
+      - Keycloak__RequireHttpsMetadata=false

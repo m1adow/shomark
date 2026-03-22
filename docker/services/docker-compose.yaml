@@ -1,2 +1,3 @@
 include:
   - worker/docker-compose.yaml
+  - api/docker-compose.yaml
