@@ -1,0 +1,6 @@
+@ShoMark.Api_HostAddress = http://localhost:5088
+
+GET {{ShoMark.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

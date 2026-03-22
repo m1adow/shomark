@@ -2,3 +2,5 @@ include:
   - ollama/docker-compose.yaml
   - minio/docker-compose.yaml
   - kafka/docker-compose.yaml
+  - postgres/docker-compose.yaml
+  - keycloak/docker-compose.yaml
