@@ -1,3 +1,4 @@
 include:
   - worker/docker-compose.yaml
   - api/docker-compose.yaml
+  - client/docker-compose.yaml

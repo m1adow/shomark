@@ -11,4 +11,5 @@ public class Video : BaseEntity
 
     // Navigation
     public ICollection<AiFragment> Fragments { get; set; } = [];
+    public ICollection<Campaign> Campaigns { get; set; } = [];
 }

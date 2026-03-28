@@ -44,6 +44,17 @@ namespace ShoMark.Infrastructure.Migrations
                         .HasColumnType("double precision")
                         .HasColumnName("end_time");
 
+                    b.Property<string>("Hashtags")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("hashtags");
+
+                    b.Property<bool>("IsApproved")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_approved");
+
                     b.Property<string>("MinioKey")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -52,6 +63,11 @@ namespace ShoMark.Infrastructure.Migrations
                     b.Property<double>("StartTime")
                         .HasColumnType("double precision")
                         .HasColumnName("start_time");
+
+                    b.Property<string>("ThumbnailKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("thumbnail_key");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -62,6 +78,10 @@ namespace ShoMark.Infrastructure.Migrations
                     b.Property<Guid>("VideoId")
                         .HasColumnType("uuid")
                         .HasColumnName("video_id");
+
+                    b.Property<double?>("ViralScore")
+                        .HasColumnType("double precision")
+                        .HasColumnName("viral_score");
 
                     b.HasKey("Id");
 
@@ -144,7 +164,11 @@ namespace ShoMark.Infrastructure.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<Guid>("FragmentId")
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<Guid?>("FragmentId")
                         .HasColumnType("uuid")
                         .HasColumnName("fragment_id");
 
@@ -159,6 +183,11 @@ namespace ShoMark.Infrastructure.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
+                    b.Property<string>("TargetAudience")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("target_audience");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -169,14 +198,17 @@ namespace ShoMark.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
+                    b.Property<Guid?>("VideoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("video_id");
+
                     b.HasKey("Id");
 
                     b.HasIndex("FragmentId");
 
                     b.HasIndex("UserId");
 
-                    b.HasIndex("UserId", "FragmentId")
-                        .IsUnique();
+                    b.HasIndex("VideoId");
 
                     b.ToTable("campaigns", (string)null);
                 });
@@ -266,6 +298,10 @@ namespace ShoMark.Infrastructure.Migrations
                         .HasColumnName("id")
                         .HasDefaultValueSql("gen_random_uuid()");
 
+                    b.Property<Guid?>("CampaignId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("campaign_id");
+
                     b.Property<string>("Content")
                         .HasColumnType("text")
                         .HasColumnName("content");
@@ -315,6 +351,8 @@ namespace ShoMark.Infrastructure.Migrations
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CampaignId");
 
                     b.HasIndex("FragmentId");
 
@@ -494,8 +532,7 @@ namespace ShoMark.Infrastructure.Migrations
                     b.HasOne("ShoMark.Domain.Entities.AiFragment", "Fragment")
                         .WithMany("Campaigns")
                         .HasForeignKey("FragmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("ShoMark.Domain.Entities.User", "User")
                         .WithMany("Campaigns")
@@ -503,9 +540,16 @@ namespace ShoMark.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ShoMark.Domain.Entities.Video", "Video")
+                        .WithMany("Campaigns")
+                        .HasForeignKey("VideoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Fragment");
 
                     b.Navigation("User");
+
+                    b.Navigation("Video");
                 });
 
             modelBuilder.Entity("ShoMark.Domain.Entities.FragmentTag", b =>
@@ -540,6 +584,11 @@ namespace ShoMark.Infrastructure.Migrations
 
             modelBuilder.Entity("ShoMark.Domain.Entities.Post", b =>
                 {
+                    b.HasOne("ShoMark.Domain.Entities.Campaign", "Campaign")
+                        .WithMany("Posts")
+                        .HasForeignKey("CampaignId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ShoMark.Domain.Entities.AiFragment", "Fragment")
                         .WithMany("Posts")
                         .HasForeignKey("FragmentId")
@@ -552,6 +601,8 @@ namespace ShoMark.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("Campaign");
+
                     b.Navigation("Fragment");
 
                     b.Navigation("Platform");
@@ -563,6 +614,11 @@ namespace ShoMark.Infrastructure.Migrations
 
                     b.Navigation("FragmentTags");
 
+                    b.Navigation("Posts");
+                });
+
+            modelBuilder.Entity("ShoMark.Domain.Entities.Campaign", b =>
+                {
                     b.Navigation("Posts");
                 });
 
@@ -590,6 +646,8 @@ namespace ShoMark.Infrastructure.Migrations
 
             modelBuilder.Entity("ShoMark.Domain.Entities.Video", b =>
                 {
+                    b.Navigation("Campaigns");
+
                     b.Navigation("Fragments");
                 });
 #pragma warning restore 612, 618

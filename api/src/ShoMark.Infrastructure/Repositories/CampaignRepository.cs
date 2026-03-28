@@ -22,4 +22,12 @@ public class CampaignRepository : Repository<Campaign>, ICampaignRepository
         return await DbSet.AsNoTracking()
             .FirstOrDefaultAsync(c => c.UserId == userId && c.FragmentId == fragmentId, ct);
     }
+
+    public async Task<IReadOnlyList<Campaign>> GetByVideoIdAsync(Guid videoId, CancellationToken ct = default)
+    {
+        return await DbSet.AsNoTracking()
+            .Where(c => c.VideoId == videoId)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync(ct);
+    }
 }

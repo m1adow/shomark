@@ -41,7 +41,9 @@ public class AiFragmentService : IAiFragmentService
 
         var dto = new AiFragmentDetailDto(
             fragment.Id, fragment.VideoId, fragment.Description,
-            fragment.StartTime, fragment.EndTime, fragment.MinioKey, fragment.CreatedAt,
+            fragment.StartTime, fragment.EndTime, fragment.MinioKey,
+            fragment.ViralScore, fragment.Hashtags, fragment.ThumbnailKey,
+            fragment.IsApproved, fragment.CreatedAt,
             fragment.FragmentTags.Select(ft => new TagSummaryDto(ft.Tag.Id, ft.Tag.Name, ft.Tag.Slug)).ToList(),
             fragment.Posts.Select(p => new PostSummaryDto(p.Id, p.Title, p.Status.ToString())).ToList());
 
@@ -63,7 +65,10 @@ public class AiFragmentService : IAiFragmentService
             Description = request.Description,
             StartTime = request.StartTime,
             EndTime = request.EndTime,
-            MinioKey = request.MinioKey
+            MinioKey = request.MinioKey,
+            ViralScore = request.ViralScore,
+            Hashtags = request.Hashtags,
+            ThumbnailKey = request.ThumbnailKey
         };
 
         if (request.TagIds?.Count > 0)
@@ -90,6 +95,9 @@ public class AiFragmentService : IAiFragmentService
         fragment.StartTime = request.StartTime;
         fragment.EndTime = request.EndTime;
         fragment.MinioKey = request.MinioKey;
+        if (request.ViralScore.HasValue) fragment.ViralScore = request.ViralScore.Value;
+        if (request.Hashtags is not null) fragment.Hashtags = request.Hashtags;
+        if (request.IsApproved.HasValue) fragment.IsApproved = request.IsApproved.Value;
 
         await _fragmentRepository.UpdateAsync(fragment, ct);
         return Result<AiFragmentDto>.Success(MapToDto(fragment));
@@ -135,5 +143,6 @@ public class AiFragmentService : IAiFragmentService
     }
 
     private static AiFragmentDto MapToDto(AiFragment f) => new(
-        f.Id, f.VideoId, f.Description, f.StartTime, f.EndTime, f.MinioKey, f.CreatedAt, f.UpdatedAt);
+        f.Id, f.VideoId, f.Description, f.StartTime, f.EndTime, f.MinioKey,
+        f.ViralScore, f.Hashtags, f.ThumbnailKey, f.IsApproved, f.CreatedAt, f.UpdatedAt);
 }

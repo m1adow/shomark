@@ -1,0 +1,318 @@
+import { useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Steps } from 'primereact/steps';
+import { Toast } from 'primereact/toast';
+import { useAuth } from '../../auth';
+import { useCreateCampaign, useUpdateCampaign } from '../../hooks/useCampaigns';
+import { useUploadVideo, useProcessVideo, useVideoUrl } from '../../hooks/useVideos';
+import { useVideoFragments, useUpdateFragment } from '../../hooks/useFragments';
+import { useCreatePost, useCampaignPosts, useScheduledPostsInRange } from '../../hooks/usePosts';
+import { useUserPlatforms } from '../../hooks/usePlatforms';
+import StepCampaignSetup, { type CampaignSetupData } from './StepCampaignSetup';
+import StepAiReview from './StepAiReview';
+import StepSchedulePublish from './StepSchedulePublish';
+import type { CampaignDto } from '../../api/types';
+
+const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+
+const stepItems = [
+  { label: 'Campaign Setup' },
+  { label: 'AI Review' },
+  { label: 'Schedule & Publish' },
+];
+
+export default function CreateCampaignPage() {
+  const navigate = useNavigate();
+  const toast = useRef<Toast>(null);
+  useAuth();
+
+  const [activeStep, setActiveStep] = useState(0);
+
+  // ── Step 1 state ───────────────────────────────────────────────────────
+  const [setupData, setSetupData] = useState<CampaignSetupData>({
+    name: '',
+    targetAudience: null,
+    description: '',
+    file: null,
+  });
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Created campaign reference
+  const [campaign, setCampaign] = useState<CampaignDto | null>(null);
+  const [videoId, setVideoId] = useState<string | null>(null);
+
+  // ── Mutations ──────────────────────────────────────────────────────────
+  const { execute: createCampaign } = useCreateCampaign();
+  const { execute: updateCampaign } = useUpdateCampaign();
+  const { execute: uploadVideo } = useUploadVideo();
+  const { execute: processVideo } = useProcessVideo();
+  const { execute: createPost } = useCreatePost();
+  const { execute: updateFragment } = useUpdateFragment();
+
+  // ── Step 2 queries (only when videoId is set) ──────────────────────────
+  const {
+    data: fragments,
+    loading: fragmentsLoading,
+    error: fragmentsError,
+    refetch: refetchFragments,
+  } = useVideoFragments(videoId ?? '', !!videoId);
+
+  // Workaround: useVideoFragments doesn't support enabled, pass videoId conditionally
+  const {
+    data: videoUrlData,
+  } = useVideoUrl(videoId ?? '', !!videoId);
+
+  const [regenerating, setRegenerating] = useState(false);
+
+  // ── Step 3 queries ─────────────────────────────────────────────────────
+  const { data: platforms, loading: platformsLoading } = useUserPlatforms(DEMO_USER_ID);
+
+  const {
+    data: campaignPosts,
+  } = useCampaignPosts(campaign?.id ?? '', !!campaign);
+
+  // Scheduled posts for current month
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+  const { data: scheduledPosts } = useScheduledPostsInRange(monthStart, monthEnd);
+
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+
+  // ── Step 1: Analyze with AI ────────────────────────────────────────────
+  const handleStep1Next = useCallback(async () => {
+    if (!setupData.file) return;
+
+    setUploading(true);
+    setUploadError(null);
+    setUploadProgress(10);
+
+    try {
+      // 1. Upload video
+      const video = await uploadVideo(setupData.file);
+      setVideoId(video.id);
+      setUploadProgress(50);
+
+      // 2. Create campaign
+      const camp = await createCampaign({
+        userId: DEMO_USER_ID,
+        videoId: video.id,
+        name: setupData.name,
+        targetAudience: setupData.targetAudience ?? undefined,
+        description: setupData.description || undefined,
+      });
+      setCampaign(camp);
+      setUploadProgress(70);
+
+      // 3. Trigger AI processing
+      await processVideo(video.id, {});
+      setUploadProgress(100);
+
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Video uploaded',
+        detail: 'AI processing started. Clips will appear shortly.',
+        life: 4000,
+      });
+
+      // Move to step 2
+      setActiveStep(1);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }, [setupData, uploadVideo, createCampaign, processVideo]);
+
+  // ── Step 2: Approve / Update / Regenerate ──────────────────────────────
+  const handleApprove = useCallback(
+    async (fragmentId: string, approved: boolean) => {
+      try {
+        const frag = fragments?.find((f) => f.id === fragmentId);
+        if (!frag) return;
+        await updateFragment(fragmentId, {
+          description: frag.description ?? undefined,
+          startTime: frag.startTime,
+          endTime: frag.endTime,
+          isApproved: approved,
+        });
+        refetchFragments();
+      } catch {
+        toast.current?.show({ severity: 'error', summary: 'Failed to update clip', life: 3000 });
+      }
+    },
+    [fragments, updateFragment, refetchFragments],
+  );
+
+  const handleUpdateCaption = useCallback(
+    async (fragmentId: string, description: string) => {
+      try {
+        const frag = fragments?.find((f) => f.id === fragmentId);
+        if (!frag) return;
+        await updateFragment(fragmentId, {
+          description,
+          startTime: frag.startTime,
+          endTime: frag.endTime,
+        });
+        refetchFragments();
+      } catch {
+        toast.current?.show({ severity: 'error', summary: 'Failed to update caption', life: 3000 });
+      }
+    },
+    [fragments, updateFragment, refetchFragments],
+  );
+
+  const handleRegenerate = useCallback(async () => {
+    if (!videoId) return;
+    setRegenerating(true);
+    try {
+      await processVideo(videoId, {});
+      toast.current?.show({
+        severity: 'info',
+        summary: 'Regenerating',
+        detail: 'AI processing restarted. Refresh in a moment.',
+        life: 4000,
+      });
+      // Wait a bit then refetch
+      setTimeout(() => {
+        refetchFragments();
+        setRegenerating(false);
+      }, 3000);
+    } catch {
+      setRegenerating(false);
+      toast.current?.show({ severity: 'error', summary: 'Regeneration failed', life: 3000 });
+    }
+  }, [videoId, processVideo, refetchFragments]);
+
+  // ── Step 3: Schedule / Publish ─────────────────────────────────────────
+  const approvedFragments = (fragments ?? []).filter((f) => f.isApproved);
+
+  const handleSchedule = useCallback(
+    async (platformIds: string[], scheduledAt: Date) => {
+      if (!campaign) return;
+      setPublishing(true);
+      setPublishError(null);
+      try {
+        for (const frag of approvedFragments) {
+          for (const platformId of platformIds) {
+            await createPost({
+              fragmentId: frag.id,
+              platformId,
+              campaignId: campaign.id,
+              title: frag.description ?? undefined,
+              content: frag.hashtags ?? undefined,
+              scheduledAt: scheduledAt.toISOString(),
+            });
+          }
+        }
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Scheduled!',
+          detail: `${approvedFragments.length * platformIds.length} post(s) scheduled.`,
+          life: 4000,
+        });
+        navigate('/campaigns');
+      } catch (err) {
+        setPublishError(err instanceof Error ? err.message : 'Scheduling failed');
+      } finally {
+        setPublishing(false);
+      }
+    },
+    [campaign, approvedFragments, createPost, navigate],
+  );
+
+  const handlePublishNow = useCallback(
+    async (platformIds: string[]) => {
+      if (!campaign) return;
+      setPublishing(true);
+      setPublishError(null);
+      try {
+        for (const frag of approvedFragments) {
+          for (const platformId of platformIds) {
+            await createPost({
+              fragmentId: frag.id,
+              platformId,
+              campaignId: campaign.id,
+              title: frag.description ?? undefined,
+              content: frag.hashtags ?? undefined,
+            });
+          }
+        }
+        // Mark campaign as Active
+        await updateCampaign(campaign.id, { status: 1 });
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Published!',
+          detail: `${approvedFragments.length * platformIds.length} post(s) created.`,
+          life: 4000,
+        });
+        navigate('/campaigns');
+      } catch (err) {
+        setPublishError(err instanceof Error ? err.message : 'Publishing failed');
+      } finally {
+        setPublishing(false);
+      }
+    },
+    [campaign, approvedFragments, createPost, updateCampaign, navigate],
+  );
+
+  return (
+    <div>
+      <Toast ref={toast} />
+
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Create Campaign</h1>
+      </div>
+
+      <Steps
+        model={stepItems}
+        activeIndex={activeStep}
+        readOnly
+        className="mb-8"
+      />
+
+      {activeStep === 0 && (
+        <StepCampaignSetup
+          data={setupData}
+          onChange={setSetupData}
+          onNext={handleStep1Next}
+          uploading={uploading}
+          uploadProgress={uploadProgress}
+          uploadError={uploadError}
+        />
+      )}
+
+      {activeStep === 1 && (
+        <StepAiReview
+          fragments={fragments ?? []}
+          loading={fragmentsLoading}
+          error={fragmentsError}
+          videoUrl={videoUrlData?.url ?? null}
+          onApprove={handleApprove}
+          onUpdateCaption={handleUpdateCaption}
+          onRegenerate={handleRegenerate}
+          onNext={() => setActiveStep(2)}
+          onBack={() => setActiveStep(0)}
+          regenerating={regenerating}
+        />
+      )}
+
+      {activeStep === 2 && (
+        <StepSchedulePublish
+          approvedFragments={approvedFragments}
+          platforms={platforms ?? []}
+          platformsLoading={platformsLoading}
+          scheduledPosts={[...(campaignPosts ?? []), ...(scheduledPosts ?? [])]}
+          onSchedule={handleSchedule}
+          onPublishNow={handlePublishNow}
+          onBack={() => setActiveStep(1)}
+          publishing={publishing}
+          publishError={publishError}
+        />
+      )}
+    </div>
+  );
+}

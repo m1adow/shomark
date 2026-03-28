@@ -6,6 +6,7 @@ public class Post : BaseEntity
 {
     public Guid FragmentId { get; set; }
     public Guid PlatformId { get; set; }
+    public Guid? CampaignId { get; set; }
     public string? Title { get; set; }
     public string? Content { get; set; }
     public string? ExternalUrl { get; set; }
@@ -16,5 +17,6 @@ public class Post : BaseEntity
     // Navigation
     public AiFragment Fragment { get; set; } = null!;
     public Platform Platform { get; set; } = null!;
+    public Campaign? Campaign { get; set; }
     public Analytics? Analytics { get; set; }
 }

@@ -11,15 +11,18 @@ public class CampaignService : ICampaignService
     private readonly ICampaignRepository _campaignRepository;
     private readonly IUserRepository _userRepository;
     private readonly IAiFragmentRepository _fragmentRepository;
+    private readonly IVideoRepository _videoRepository;
 
     public CampaignService(
         ICampaignRepository campaignRepository,
         IUserRepository userRepository,
-        IAiFragmentRepository fragmentRepository)
+        IAiFragmentRepository fragmentRepository,
+        IVideoRepository videoRepository)
     {
         _campaignRepository = campaignRepository;
         _userRepository = userRepository;
         _fragmentRepository = fragmentRepository;
+        _videoRepository = videoRepository;
     }
 
     public async Task<Result<CampaignDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -38,26 +41,41 @@ public class CampaignService : ICampaignService
             campaigns.Select(MapToDto).ToList());
     }
 
+    public async Task<Result<IReadOnlyList<CampaignDto>>> GetByVideoIdAsync(Guid videoId, CancellationToken ct = default)
+    {
+        var campaigns = await _campaignRepository.GetByVideoIdAsync(videoId, ct);
+        return Result<IReadOnlyList<CampaignDto>>.Success(
+            campaigns.Select(MapToDto).ToList());
+    }
+
     public async Task<Result<CampaignDto>> CreateAsync(CreateCampaignRequest request, CancellationToken ct = default)
     {
         var user = await _userRepository.GetByIdAsync(request.UserId, ct);
         if (user is null)
             return Result<CampaignDto>.Failure("User not found", "NOT_FOUND");
 
-        var fragment = await _fragmentRepository.GetByIdAsync(request.FragmentId, ct);
-        if (fragment is null)
-            return Result<CampaignDto>.Failure("Fragment not found", "NOT_FOUND");
+        if (request.FragmentId.HasValue)
+        {
+            var fragment = await _fragmentRepository.GetByIdAsync(request.FragmentId.Value, ct);
+            if (fragment is null)
+                return Result<CampaignDto>.Failure("Fragment not found", "NOT_FOUND");
+        }
 
-        var existing = await _campaignRepository.GetByUserAndFragmentAsync(request.UserId, request.FragmentId, ct);
-        if (existing is not null)
-            return Result<CampaignDto>.Failure(
-                "A campaign already exists for this user and fragment", "DUPLICATE");
+        if (request.VideoId.HasValue)
+        {
+            var video = await _videoRepository.GetByIdAsync(request.VideoId.Value, ct);
+            if (video is null)
+                return Result<CampaignDto>.Failure("Video not found", "NOT_FOUND");
+        }
 
         var campaign = new Campaign
         {
             UserId = request.UserId,
             FragmentId = request.FragmentId,
-            Name = request.Name
+            VideoId = request.VideoId,
+            Name = request.Name,
+            TargetAudience = request.TargetAudience,
+            Description = request.Description
         };
 
         var created = await _campaignRepository.AddAsync(campaign, ct);
@@ -72,6 +90,10 @@ public class CampaignService : ICampaignService
 
         if (request.Name is not null) campaign.Name = request.Name;
         if (request.Status.HasValue) campaign.Status = request.Status.Value;
+        if (request.TargetAudience.HasValue) campaign.TargetAudience = request.TargetAudience.Value;
+        if (request.Description is not null) campaign.Description = request.Description;
+        if (request.VideoId.HasValue) campaign.VideoId = request.VideoId.Value;
+        if (request.FragmentId.HasValue) campaign.FragmentId = request.FragmentId.Value;
 
         await _campaignRepository.UpdateAsync(campaign, ct);
         return Result<CampaignDto>.Success(MapToDto(campaign));
@@ -88,5 +110,7 @@ public class CampaignService : ICampaignService
     }
 
     private static CampaignDto MapToDto(Campaign c) => new(
-        c.Id, c.UserId, c.FragmentId, c.Name, c.Status.ToString(), c.CreatedAt, c.UpdatedAt);
+        c.Id, c.UserId, c.FragmentId, c.VideoId, c.Name,
+        c.TargetAudience?.ToString(), c.Description,
+        c.Status.ToString(), c.CreatedAt, c.UpdatedAt);
 }

@@ -6,5 +6,6 @@ public enum PlatformType
     TikTok = 1,
     YouTube = 2,
     X = 3,
-    LinkedIn = 4
+    LinkedIn = 4,
+    Telegram = 5
 }

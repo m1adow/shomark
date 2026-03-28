@@ -9,6 +9,7 @@ using ShoMark.Domain.Interfaces;
 using ShoMark.Infrastructure.Data;
 using ShoMark.Infrastructure.Messaging;
 using ShoMark.Infrastructure.Repositories;
+using ShoMark.Infrastructure.Storage;
 
 namespace ShoMark.Infrastructure.DependencyInjection;
 
@@ -39,6 +40,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IVideoProcessingProducer, KafkaVideoProcessingProducer>();
         services.AddHostedService<KafkaCompletionConsumer>();
 
+        // MinIO Storage
+        services.Configure<MinioOptions>(configuration.GetSection(MinioOptions.SectionName));
+        services.AddSingleton<IStorageService, MinioStorageService>();
+
         // Authentication (Keycloak)
         var keycloakOptions = configuration
             .GetSection(KeycloakOptions.SectionName)
@@ -48,11 +53,14 @@ public static class ServiceCollectionExtensions
             .AddJwtBearer(options =>
             {
                 options.Authority = keycloakOptions.Authority;
-                options.Audience = keycloakOptions.Audience;
                 options.RequireHttpsMetadata = keycloakOptions.RequireHttpsMetadata;
 
-                options.TokenValidationParameters.ValidIssuer = keycloakOptions.Authority;
-                options.TokenValidationParameters.ValidAudience = keycloakOptions.Audience;
+                options.TokenValidationParameters.ValidIssuer =
+                    string.IsNullOrEmpty(keycloakOptions.ValidIssuer)
+                        ? keycloakOptions.Authority
+                        : keycloakOptions.ValidIssuer;
+
+                options.TokenValidationParameters.ValidateAudience = false;
             });
 
         services.AddAuthorization();
