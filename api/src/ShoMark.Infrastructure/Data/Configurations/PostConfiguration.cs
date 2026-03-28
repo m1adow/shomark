@@ -14,6 +14,7 @@ public class PostConfiguration : IEntityTypeConfiguration<Post>
         builder.Property(p => p.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
         builder.Property(p => p.FragmentId).HasColumnName("fragment_id").IsRequired();
         builder.Property(p => p.PlatformId).HasColumnName("platform_id").IsRequired();
+        builder.Property(p => p.CampaignId).HasColumnName("campaign_id");
         builder.Property(p => p.Title).HasColumnName("title").HasMaxLength(500);
         builder.Property(p => p.Content).HasColumnName("content").HasColumnType("text");
         builder.Property(p => p.ExternalUrl).HasColumnName("external_url").HasMaxLength(1000);
@@ -34,8 +35,14 @@ public class PostConfiguration : IEntityTypeConfiguration<Post>
             .HasForeignKey(p => p.PlatformId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(p => p.Campaign)
+            .WithMany(c => c.Posts)
+            .HasForeignKey(p => p.CampaignId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasIndex(p => p.FragmentId);
         builder.HasIndex(p => p.PlatformId);
+        builder.HasIndex(p => p.CampaignId);
         builder.HasIndex(p => p.Status);
         builder.HasIndex(p => p.ScheduledAt);
     }

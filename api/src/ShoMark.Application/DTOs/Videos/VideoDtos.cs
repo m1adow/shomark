@@ -37,4 +37,9 @@ public record FragmentSummaryDto(
     Guid Id,
     string? Description,
     double StartTime,
-    double EndTime);
+    double EndTime,
+    string? MinioKey,
+    double? ViralScore,
+    string? Hashtags,
+    string? ThumbnailKey,
+    bool IsApproved);

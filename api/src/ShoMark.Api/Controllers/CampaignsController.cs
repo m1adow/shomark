@@ -31,6 +31,13 @@ public class CampaignsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.Error, result.ErrorCode });
     }
 
+    [HttpGet("video/{videoId:guid}")]
+    public async Task<IActionResult> GetByVideoId(Guid videoId, CancellationToken ct)
+    {
+        var result = await _campaignService.GetByVideoIdAsync(videoId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.Error, result.ErrorCode });
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateCampaignRequest request, CancellationToken ct)
     {

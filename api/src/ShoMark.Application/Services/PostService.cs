@@ -60,7 +60,7 @@ public class PostService : IPostService
             : null;
 
         var dto = new PostWithAnalyticsDto(
-            post.Id, post.FragmentId, post.PlatformId, post.Title, post.Content,
+            post.Id, post.FragmentId, post.PlatformId, post.CampaignId, post.Title, post.Content,
             post.ExternalUrl, post.Status.ToString(), post.ScheduledAt, post.PublishedAt,
             post.CreatedAt, analyticsDto);
 
@@ -81,6 +81,7 @@ public class PostService : IPostService
         {
             FragmentId = request.FragmentId,
             PlatformId = request.PlatformId,
+            CampaignId = request.CampaignId,
             Title = request.Title,
             Content = request.Content,
             ScheduledAt = request.ScheduledAt,
@@ -119,6 +120,20 @@ public class PostService : IPostService
     }
 
     private static PostDto MapToDto(Post p) => new(
-        p.Id, p.FragmentId, p.PlatformId, p.Title, p.Content, p.ExternalUrl,
+        p.Id, p.FragmentId, p.PlatformId, p.CampaignId, p.Title, p.Content, p.ExternalUrl,
         p.Status.ToString(), p.ScheduledAt, p.PublishedAt, p.CreatedAt, p.UpdatedAt);
+
+    public async Task<Result<IReadOnlyList<PostDto>>> GetByCampaignIdAsync(Guid campaignId, CancellationToken ct = default)
+    {
+        var posts = await _postRepository.GetByCampaignIdAsync(campaignId, ct);
+        return Result<IReadOnlyList<PostDto>>.Success(
+            posts.Select(MapToDto).ToList());
+    }
+
+    public async Task<Result<IReadOnlyList<PostDto>>> GetScheduledInRangeAsync(DateTime from, DateTime to, CancellationToken ct = default)
+    {
+        var posts = await _postRepository.GetScheduledInRangeAsync(from, to, ct);
+        return Result<IReadOnlyList<PostDto>>.Success(
+            posts.Select(MapToDto).ToList());
+    }
 }

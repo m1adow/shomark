@@ -6,6 +6,7 @@ public record PostDto(
     Guid Id,
     Guid FragmentId,
     Guid PlatformId,
+    Guid? CampaignId,
     string? Title,
     string? Content,
     string? ExternalUrl,
@@ -18,6 +19,7 @@ public record PostDto(
 public record CreatePostRequest(
     Guid FragmentId,
     Guid PlatformId,
+    Guid? CampaignId,
     string? Title,
     string? Content,
     DateTime? ScheduledAt);
@@ -34,6 +36,7 @@ public record PostWithAnalyticsDto(
     Guid Id,
     Guid FragmentId,
     Guid PlatformId,
+    Guid? CampaignId,
     string? Title,
     string? Content,
     string? ExternalUrl,

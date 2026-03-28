@@ -17,6 +17,10 @@ public class AiFragmentConfiguration : IEntityTypeConfiguration<AiFragment>
         builder.Property(f => f.StartTime).HasColumnName("start_time").IsRequired();
         builder.Property(f => f.EndTime).HasColumnName("end_time").IsRequired();
         builder.Property(f => f.MinioKey).HasColumnName("minio_key").HasMaxLength(500);
+        builder.Property(f => f.ViralScore).HasColumnName("viral_score");
+        builder.Property(f => f.Hashtags).HasColumnName("hashtags").HasMaxLength(1000);
+        builder.Property(f => f.ThumbnailKey).HasColumnName("thumbnail_key").HasMaxLength(500);
+        builder.Property(f => f.IsApproved).HasColumnName("is_approved").HasDefaultValue(false);
         builder.Property(f => f.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
         builder.Property(f => f.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
 

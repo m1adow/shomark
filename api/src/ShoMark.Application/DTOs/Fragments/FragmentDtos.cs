@@ -7,6 +7,10 @@ public record AiFragmentDto(
     double StartTime,
     double EndTime,
     string? MinioKey,
+    double? ViralScore,
+    string? Hashtags,
+    string? ThumbnailKey,
+    bool IsApproved,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
@@ -16,13 +20,19 @@ public record CreateAiFragmentRequest(
     double StartTime,
     double EndTime,
     string? MinioKey,
+    double? ViralScore,
+    string? Hashtags,
+    string? ThumbnailKey,
     List<string>? TagIds);
 
 public record UpdateAiFragmentRequest(
     string? Description,
     double StartTime,
     double EndTime,
-    string? MinioKey);
+    string? MinioKey,
+    double? ViralScore,
+    string? Hashtags,
+    bool? IsApproved);
 
 public record AiFragmentDetailDto(
     Guid Id,
@@ -31,6 +41,10 @@ public record AiFragmentDetailDto(
     double StartTime,
     double EndTime,
     string? MinioKey,
+    double? ViralScore,
+    string? Hashtags,
+    string? ThumbnailKey,
+    bool IsApproved,
     DateTime CreatedAt,
     IReadOnlyList<TagSummaryDto> Tags,
     IReadOnlyList<PostSummaryDto> Posts);

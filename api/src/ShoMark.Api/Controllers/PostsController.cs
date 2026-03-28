@@ -46,6 +46,20 @@ public class PostsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.Error, result.ErrorCode });
     }
 
+    [HttpGet("campaign/{campaignId:guid}")]
+    public async Task<IActionResult> GetByCampaignId(Guid campaignId, CancellationToken ct)
+    {
+        var result = await _postService.GetByCampaignIdAsync(campaignId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.Error, result.ErrorCode });
+    }
+
+    [HttpGet("scheduled")]
+    public async Task<IActionResult> GetScheduledInRange([FromQuery] DateTime from, [FromQuery] DateTime to, CancellationToken ct)
+    {
+        var result = await _postService.GetScheduledInRangeAsync(from, to, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.Error, result.ErrorCode });
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePostRequest request, CancellationToken ct)
     {

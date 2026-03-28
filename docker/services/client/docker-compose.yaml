@@ -1,0 +1,15 @@
+services:
+  client:
+    build:
+      context: ../../../client
+      dockerfile: Dockerfile
+      args:
+        VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL}
+        VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM}
+        VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    container_name: client
+    ports:
+      - "${CLIENT_PORT}:3000"
+    depends_on:
+      - api

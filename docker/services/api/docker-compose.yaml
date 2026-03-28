@@ -20,5 +20,7 @@ services:
       - Kafka__CompletionTopic=video-processing-completed
       - Kafka__ConsumerGroupId=api-group
       - Keycloak__Authority=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+      - Keycloak__ValidIssuer=http://localhost:${KEYCLOAK_PORT}/realms/${KEYCLOAK_REALM}
       - Keycloak__Audience=${KEYCLOAK_CLIENT_ID}
       - Keycloak__RequireHttpsMetadata=false
+      - Cors__AllowedOrigins__0=http://localhost:${CLIENT_PORT}

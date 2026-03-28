@@ -75,4 +75,30 @@ public class VideosController : ControllerBase
             ? Accepted(new { message = "Video processing started" })
             : NotFound(new { result.Error, result.ErrorCode });
     }
+
+    [HttpPost("upload")]
+    [RequestSizeLimit(2L * 1024 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 2L * 1024 * 1024 * 1024)]
+    public async Task<IActionResult> Upload(IFormFile file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { Error = "No file provided", ErrorCode = "VALIDATION_ERROR" });
+
+        var allowedTypes = new[] { "video/mp4", "video/quicktime" };
+        if (!allowedTypes.Contains(file.ContentType))
+            return BadRequest(new { Error = "Only MP4 and MOV files are allowed", ErrorCode = "VALIDATION_ERROR" });
+
+        await using var stream = file.OpenReadStream();
+        var result = await _videoService.UploadAsync(stream, file.FileName, file.Length, file.ContentType, ct);
+        return result.IsSuccess
+            ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value)
+            : BadRequest(new { result.Error, result.ErrorCode });
+    }
+
+    [HttpGet("{id:guid}/url")]
+    public async Task<IActionResult> GetVideoUrl(Guid id, CancellationToken ct)
+    {
+        var result = await _videoService.GetVideoUrlAsync(id, ct);
+        return result.IsSuccess ? Ok(new { url = result.Value }) : NotFound(new { result.Error, result.ErrorCode });
+    }
 }

@@ -7,6 +7,10 @@ public class AiFragment : BaseEntity
     public double StartTime { get; set; }
     public double EndTime { get; set; }
     public string? MinioKey { get; set; }
+    public double? ViralScore { get; set; }
+    public string? Hashtags { get; set; }
+    public string? ThumbnailKey { get; set; }
+    public bool IsApproved { get; set; }
 
     // Navigation
     public Video Video { get; set; } = null!;
