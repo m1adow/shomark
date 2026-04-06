@@ -12,6 +12,5 @@ public class Platform : BaseEntity
     public DateTime? TokenExpiresAt { get; set; }
 
     // Navigation
-    public User User { get; set; } = null!;
     public ICollection<Post> Posts { get; set; } = [];
 }

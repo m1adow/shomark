@@ -4,13 +4,15 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ShoMark.Application.Common;
 using ShoMark.Application.Interfaces;
+using ShoMark.Domain.Enums;
 
 namespace ShoMark.Infrastructure.Messaging;
 
 /// <summary>
 /// Kafka producer that sends video-processing requests to the worker.
-/// Message format matches what the Python worker consumer expects:
-/// {"video_bucket": "...", "video_key": "...", "output_bucket": "...", "output_prefix": "..."}
+/// Message format:
+/// {"video_bucket": "...", "video_key": "...", "output_bucket": "...", "output_prefix": "...",
+///  "target_audience": "Applicants|Masters|Professionals", "description": "..."}
 /// </summary>
 public class KafkaVideoProcessingProducer : IVideoProcessingProducer, IDisposable
 {
@@ -39,6 +41,8 @@ public class KafkaVideoProcessingProducer : IVideoProcessingProducer, IDisposabl
         string videoKey,
         string outputBucket,
         string outputPrefix,
+        TargetAudience? targetAudience = null,
+        string? description = null,
         CancellationToken ct = default)
     {
         var message = new
@@ -46,7 +50,9 @@ public class KafkaVideoProcessingProducer : IVideoProcessingProducer, IDisposabl
             video_bucket = videoBucket,
             video_key = videoKey,
             output_bucket = outputBucket,
-            output_prefix = outputPrefix
+            output_prefix = outputPrefix,
+            target_audience = targetAudience?.ToString(),
+            description,
         };
 
         var payload = JsonSerializer.Serialize(message);

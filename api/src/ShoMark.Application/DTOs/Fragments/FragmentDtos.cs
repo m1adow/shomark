@@ -22,8 +22,7 @@ public record CreateAiFragmentRequest(
     string? MinioKey,
     double? ViralScore,
     string? Hashtags,
-    string? ThumbnailKey,
-    List<string>? TagIds);
+    string? ThumbnailKey);
 
 public record UpdateAiFragmentRequest(
     string? Description,
@@ -46,9 +45,6 @@ public record AiFragmentDetailDto(
     string? ThumbnailKey,
     bool IsApproved,
     DateTime CreatedAt,
-    IReadOnlyList<TagSummaryDto> Tags,
     IReadOnlyList<PostSummaryDto> Posts);
-
-public record TagSummaryDto(Guid Id, string Name, string Slug);
 
 public record PostSummaryDto(Guid Id, string? Title, string Status);

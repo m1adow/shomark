@@ -9,12 +9,12 @@ namespace ShoMark.Application.Services;
 public class PlatformService : IPlatformService
 {
     private readonly IPlatformRepository _platformRepository;
-    private readonly IUserRepository _userRepository;
+    private readonly ICurrentUserAccessor _currentUser;
 
-    public PlatformService(IPlatformRepository platformRepository, IUserRepository userRepository)
+    public PlatformService(IPlatformRepository platformRepository, ICurrentUserAccessor currentUser)
     {
         _platformRepository = platformRepository;
-        _userRepository = userRepository;
+        _currentUser = currentUser;
     }
 
     public async Task<Result<PlatformDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -35,13 +35,11 @@ public class PlatformService : IPlatformService
 
     public async Task<Result<PlatformDto>> CreateAsync(CreatePlatformRequest request, CancellationToken ct = default)
     {
-        var user = await _userRepository.GetByIdAsync(request.UserId, ct);
-        if (user is null)
-            return Result<PlatformDto>.Failure("User not found", "NOT_FOUND");
+        var userId = _currentUser.UserId;
 
         var platform = new Platform
         {
-            UserId = request.UserId,
+            UserId = userId,
             PlatformType = request.PlatformType,
             AccountName = request.AccountName,
             AccessToken = request.AccessToken,

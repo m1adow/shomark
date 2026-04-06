@@ -12,7 +12,6 @@ public record PlatformDto(
     DateTime UpdatedAt);
 
 public record CreatePlatformRequest(
-    Guid UserId,
     PlatformType PlatformType,
     string? AccountName,
     string? AccessToken,

@@ -8,11 +8,11 @@ import type {
 const PATH = '/platforms';
 
 export const platformsApi = {
+  getAll: (signal?: AbortSignal) =>
+    get<PlatformDto[]>(PATH, signal),
+
   getById: (id: string, signal?: AbortSignal) =>
     get<PlatformDto>(`${PATH}/${id}`, signal),
-
-  getByUserId: (userId: string, signal?: AbortSignal) =>
-    get<PlatformDto[]>(`${PATH}/user/${userId}`, signal),
 
   create: (req: CreatePlatformRequest, signal?: AbortSignal) =>
     post<PlatformDto>(PATH, req, signal),

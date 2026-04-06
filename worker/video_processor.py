@@ -46,6 +46,8 @@ class VideoProcessor:
                     "preview_path": preview_path,
                     "title": clip_info.get("title", ""),
                     "reason": clip_info.get("reason", ""),
+                    "viral_score": clip_info.get("viral_score"),
+                    "hashtags": clip_info.get("hashtags"),
                     "start": start,
                     "end": end,
                 })

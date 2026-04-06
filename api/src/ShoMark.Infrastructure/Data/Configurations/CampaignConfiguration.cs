@@ -24,11 +24,6 @@ public class CampaignConfiguration : IEntityTypeConfiguration<Campaign>
         builder.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
         builder.Property(c => c.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
 
-        builder.HasOne(c => c.User)
-            .WithMany(u => u.Campaigns)
-            .HasForeignKey(c => c.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
-
         builder.HasOne(c => c.Fragment)
             .WithMany(f => f.Campaigns)
             .HasForeignKey(c => c.FragmentId)

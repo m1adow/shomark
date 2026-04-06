@@ -78,7 +78,6 @@ export interface CampaignDto {
 }
 
 export interface CreateCampaignRequest {
-  userId: string;
   fragmentId?: string;
   videoId?: string;
   name?: string;
@@ -121,7 +120,6 @@ export interface CreateAiFragmentRequest {
   viralScore?: number;
   hashtags?: string;
   thumbnailKey?: string;
-  tagIds?: string[];
 }
 
 export interface UpdateAiFragmentRequest {
@@ -146,14 +144,7 @@ export interface AiFragmentDetailDto {
   thumbnailKey: string | null;
   isApproved: boolean;
   createdAt: string;
-  tags: TagSummaryDto[];
   posts: PostSummaryDto[];
-}
-
-export interface TagSummaryDto {
-  id: string;
-  name: string;
-  slug: string;
 }
 
 export interface PostSummaryDto {
@@ -175,7 +166,6 @@ export interface PlatformDto {
 }
 
 export interface CreatePlatformRequest {
-  userId: string;
   platformType: PlatformType;
   accountName?: string;
   accessToken?: string;
@@ -240,60 +230,6 @@ export interface PostWithAnalyticsDto {
   analytics: AnalyticsSummaryDto | null;
 }
 
-// ── Tags ─────────────────────────────────────────────────────────────────────
-
-export interface TagDto {
-  id: string;
-  name: string;
-  slug: string;
-  createdAt: string;
-}
-
-export interface CreateTagRequest {
-  name: string;
-  slug: string;
-}
-
-export interface UpdateTagRequest {
-  name: string;
-  slug: string;
-}
-
-// ── Users ────────────────────────────────────────────────────────────────────
-
-export interface UserDto {
-  id: string;
-  name: string;
-  email: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateUserRequest {
-  name: string;
-  email: string;
-}
-
-export interface UpdateUserRequest {
-  name: string;
-  email: string;
-}
-
-export interface UserWithPlatformsDto {
-  id: string;
-  name: string;
-  email: string;
-  createdAt: string;
-  platforms: PlatformSummaryDto[];
-}
-
-export interface PlatformSummaryDto {
-  id: string;
-  platformType: string;
-  accountName: string | null;
-  tokenExpiresAt: string | null;
-}
-
 // ── Videos ───────────────────────────────────────────────────────────────────
 
 export interface VideoDto {
@@ -348,6 +284,8 @@ export interface FragmentSummaryDto {
 export interface ProcessVideoRequest {
   outputBucket?: string;
   outputPrefix?: string;
+  targetAudience?: TargetAudience;
+  description?: string;
 }
 
 // ── API Error ────────────────────────────────────────────────────────────────

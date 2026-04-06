@@ -9,18 +9,18 @@ namespace ShoMark.Application.Services;
 public class CampaignService : ICampaignService
 {
     private readonly ICampaignRepository _campaignRepository;
-    private readonly IUserRepository _userRepository;
+    private readonly ICurrentUserAccessor _currentUser;
     private readonly IAiFragmentRepository _fragmentRepository;
     private readonly IVideoRepository _videoRepository;
 
     public CampaignService(
         ICampaignRepository campaignRepository,
-        IUserRepository userRepository,
+        ICurrentUserAccessor currentUser,
         IAiFragmentRepository fragmentRepository,
         IVideoRepository videoRepository)
     {
         _campaignRepository = campaignRepository;
-        _userRepository = userRepository;
+        _currentUser = currentUser;
         _fragmentRepository = fragmentRepository;
         _videoRepository = videoRepository;
     }
@@ -50,9 +50,7 @@ public class CampaignService : ICampaignService
 
     public async Task<Result<CampaignDto>> CreateAsync(CreateCampaignRequest request, CancellationToken ct = default)
     {
-        var user = await _userRepository.GetByIdAsync(request.UserId, ct);
-        if (user is null)
-            return Result<CampaignDto>.Failure("User not found", "NOT_FOUND");
+        var userId = _currentUser.UserId;
 
         if (request.FragmentId.HasValue)
         {
@@ -70,7 +68,7 @@ public class CampaignService : ICampaignService
 
         var campaign = new Campaign
         {
-            UserId = request.UserId,
+            UserId = userId,
             FragmentId = request.FragmentId,
             VideoId = request.VideoId,
             Name = request.Name,

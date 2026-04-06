@@ -61,17 +61,4 @@ public class FragmentsController : ControllerBase
         return result.IsSuccess ? NoContent() : NotFound(new { result.Error, result.ErrorCode });
     }
 
-    [HttpPost("{fragmentId:guid}/tags/{tagId:guid}")]
-    public async Task<IActionResult> AddTag(Guid fragmentId, Guid tagId, CancellationToken ct)
-    {
-        var result = await _fragmentService.AddTagAsync(fragmentId, tagId, ct);
-        return result.IsSuccess ? Ok() : BadRequest(new { result.Error, result.ErrorCode });
-    }
-
-    [HttpDelete("{fragmentId:guid}/tags/{tagId:guid}")]
-    public async Task<IActionResult> RemoveTag(Guid fragmentId, Guid tagId, CancellationToken ct)
-    {
-        var result = await _fragmentService.RemoveTagAsync(fragmentId, tagId, ct);
-        return result.IsSuccess ? NoContent() : NotFound(new { result.Error, result.ErrorCode });
-    }
 }

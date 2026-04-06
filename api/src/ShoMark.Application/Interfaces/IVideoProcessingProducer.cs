@@ -1,3 +1,5 @@
+using ShoMark.Domain.Enums;
+
 namespace ShoMark.Application.Interfaces;
 
 /// <summary>
@@ -10,5 +12,7 @@ public interface IVideoProcessingProducer
         string videoKey,
         string outputBucket,
         string outputPrefix,
+        TargetAudience? targetAudience = null,
+        string? description = null,
         CancellationToken ct = default);
 }

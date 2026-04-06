@@ -84,6 +84,7 @@ public class VideosController : ControllerBase
         if (file is null || file.Length == 0)
             return BadRequest(new { Error = "No file provided", ErrorCode = "VALIDATION_ERROR" });
 
+        // TODO: Extract into appsettings
         var allowedTypes = new[] { "video/mp4", "video/quicktime" };
         if (!allowedTypes.Contains(file.ContentType))
             return BadRequest(new { Error = "Only MP4 and MOV files are allowed", ErrorCode = "VALIDATION_ERROR" });

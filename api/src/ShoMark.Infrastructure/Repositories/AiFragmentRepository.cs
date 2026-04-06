@@ -20,7 +20,6 @@ public class AiFragmentRepository : Repository<AiFragment>, IAiFragmentRepositor
     public async Task<AiFragment?> GetWithDetailsAsync(Guid id, CancellationToken ct = default)
     {
         return await DbSet.AsNoTracking()
-            .Include(f => f.FragmentTags).ThenInclude(ft => ft.Tag)
             .Include(f => f.Posts)
             .FirstOrDefaultAsync(f => f.Id == id, ct);
     }

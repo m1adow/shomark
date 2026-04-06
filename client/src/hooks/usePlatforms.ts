@@ -10,10 +10,10 @@ export function usePlatform(id: string) {
   );
 }
 
-export function useUserPlatforms(userId: string) {
+export function useMyPlatforms() {
   return useApiQuery(
-    (signal) => platformsApi.getByUserId(userId, signal),
-    [userId],
+    (signal) => platformsApi.getAll(signal),
+    [],
   );
 }
 

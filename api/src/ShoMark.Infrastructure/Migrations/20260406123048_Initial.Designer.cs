@@ -12,8 +12,8 @@ using ShoMark.Infrastructure.Data;
 namespace ShoMark.Infrastructure.Migrations
 {
     [DbContext(typeof(ShoMarkDbContext))]
-    [Migration("20260328125925_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260406123048_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -216,25 +216,6 @@ namespace ShoMark.Infrastructure.Migrations
                     b.ToTable("campaigns", (string)null);
                 });
 
-            modelBuilder.Entity("ShoMark.Domain.Entities.FragmentTag", b =>
-                {
-                    b.Property<Guid>("FragmentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("fragment_id");
-
-                    b.Property<Guid>("TagId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tag_id");
-
-                    b.HasKey("FragmentId", "TagId");
-
-                    b.HasIndex("FragmentId");
-
-                    b.HasIndex("TagId");
-
-                    b.ToTable("fragment_tags", (string)null);
-                });
-
             modelBuilder.Entity("ShoMark.Domain.Entities.Platform", b =>
                 {
                     b.Property<Guid>("Id")
@@ -368,89 +349,6 @@ namespace ShoMark.Infrastructure.Migrations
                     b.ToTable("posts", (string)null);
                 });
 
-            modelBuilder.Entity("ShoMark.Domain.Entities.Tag", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("slug");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.HasIndex("Slug")
-                        .IsUnique();
-
-                    b.ToTable("tags", (string)null);
-                });
-
-            modelBuilder.Entity("ShoMark.Domain.Entities.User", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("email");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Email")
-                        .IsUnique();
-
-                    b.ToTable("users", (string)null);
-                });
-
             modelBuilder.Entity("ShoMark.Domain.Entities.Video", b =>
                 {
                     b.Property<Guid>("Id")
@@ -537,12 +435,6 @@ namespace ShoMark.Infrastructure.Migrations
                         .HasForeignKey("FragmentId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("ShoMark.Domain.Entities.User", "User")
-                        .WithMany("Campaigns")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("ShoMark.Domain.Entities.Video", "Video")
                         .WithMany("Campaigns")
                         .HasForeignKey("VideoId")
@@ -550,39 +442,7 @@ namespace ShoMark.Infrastructure.Migrations
 
                     b.Navigation("Fragment");
 
-                    b.Navigation("User");
-
                     b.Navigation("Video");
-                });
-
-            modelBuilder.Entity("ShoMark.Domain.Entities.FragmentTag", b =>
-                {
-                    b.HasOne("ShoMark.Domain.Entities.AiFragment", "Fragment")
-                        .WithMany("FragmentTags")
-                        .HasForeignKey("FragmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ShoMark.Domain.Entities.Tag", "Tag")
-                        .WithMany("FragmentTags")
-                        .HasForeignKey("TagId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Fragment");
-
-                    b.Navigation("Tag");
-                });
-
-            modelBuilder.Entity("ShoMark.Domain.Entities.Platform", b =>
-                {
-                    b.HasOne("ShoMark.Domain.Entities.User", "User")
-                        .WithMany("Platforms")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ShoMark.Domain.Entities.Post", b =>
@@ -615,8 +475,6 @@ namespace ShoMark.Infrastructure.Migrations
                 {
                     b.Navigation("Campaigns");
 
-                    b.Navigation("FragmentTags");
-
                     b.Navigation("Posts");
                 });
 
@@ -633,18 +491,6 @@ namespace ShoMark.Infrastructure.Migrations
             modelBuilder.Entity("ShoMark.Domain.Entities.Post", b =>
                 {
                     b.Navigation("Analytics");
-                });
-
-            modelBuilder.Entity("ShoMark.Domain.Entities.Tag", b =>
-                {
-                    b.Navigation("FragmentTags");
-                });
-
-            modelBuilder.Entity("ShoMark.Domain.Entities.User", b =>
-                {
-                    b.Navigation("Campaigns");
-
-                    b.Navigation("Platforms");
                 });
 
             modelBuilder.Entity("ShoMark.Domain.Entities.Video", b =>

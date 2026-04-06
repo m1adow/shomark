@@ -14,7 +14,6 @@ public class AiFragment : BaseEntity
 
     // Navigation
     public Video Video { get; set; } = null!;
-    public ICollection<FragmentTag> FragmentTags { get; set; } = [];
     public ICollection<Post> Posts { get; set; } = [];
     public ICollection<Campaign> Campaigns { get; set; } = [];
 }
