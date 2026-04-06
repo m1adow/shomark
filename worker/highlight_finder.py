@@ -1,5 +1,6 @@
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from config import Config
 from llm import LLMClient
@@ -75,19 +76,21 @@ class HighlightFinder:
         description: str | None,
     ) -> str:
         profile = _audience_profile(target_audience)
-        mini_transcript = [{"s": s["start"], "t": s["text"]} for s in chunk]
+        compact = self._compact_segments(chunk)
 
         context_block = ""
         if description:
             context_block = f"\nКОНТЕКСТ КАМПАНІЇ: {description}\n"
 
         return f"""/no_think
+МОВА ВІДПОВІДІ: УКРАЇНСЬКА. Усі поля (title, reason, hashtags) — ТІЛЬКИ українською мовою.
+
 Ти — експерт з вірального контенту.
 Цільова аудиторія: {profile["persona"]}.
 Платформи публікації: {profile["platform"]}.{context_block}
 
-Ось транскрипт фрагменту відео:
-{json.dumps(mini_transcript, ensure_ascii=False)}
+Ось транскрипт фрагменту відео (s — час початку в секундах, e — час кінця, t — текст):
+{json.dumps(compact, ensure_ascii=False)}
 
 ЗАВДАННЯ:
 Знайди 2 найбільш захоплюючі моменти тривалістю рівно {self._clip_duration} секунд.
@@ -100,12 +103,13 @@ class HighlightFinder:
 
 Для кожного моменту:
 - viral_score (0.0–1.0): оцінка вірального потенціалу для цільової аудиторії
-- hashtags: 3–5 релевантних хештегів для {profile["platform"]} (через пробіл)
+- hashtags: 3–5 релевантних хештегів для {profile["platform"]} (через пробіл, українською)
 
+УВАГА: title, reason та hashtags — ТІЛЬКИ українською мовою!
 Поверни ТІЛЬКИ JSON масив (без пояснень):
 [
-  {{"start": 10.5, "end": 70.5, "title": "Короткий заголовок для {profile["platform"]}", "reason": "Чому це зачепить аудиторію", "viral_score": 0.85, "hashtags": "#хештег1 #хештег2 #хештег3"}},
-  {{"start": 150.0, "end": 210.0, "title": "Короткий заголовок для {profile["platform"]}", "reason": "Чому це зачепить аудиторію", "viral_score": 0.7, "hashtags": "#хештег1 #хештег2 #хештег3"}}
+  {{"start": 10.5, "end": 70.5, "title": "Короткий заголовок українською", "reason": "Чому це зачепить аудиторію", "viral_score": 0.85, "hashtags": "#хештег1 #хештег2 #хештег3"}},
+  {{"start": 150.0, "end": 210.0, "title": "Короткий заголовок українською", "reason": "Чому це зачепить аудиторію", "viral_score": 0.7, "hashtags": "#хештег1 #хештег2 #хештег3"}}
 ]"""
 
     def map_highlights(
@@ -137,6 +141,8 @@ class HighlightFinder:
             context_block = f"\nКОНТЕКСТ КАМПАНІЇ: {description}\n"
 
         return f"""/no_think
+МОВА ВІДПОВІДІ: УКРАЇНСЬКА. Усі поля (title, reason, hashtags) — ТІЛЬКИ українською мовою.
+
 Ти — SMM-менеджер, який готує контент для {profile["platform"]}.
 Цільова аудиторія: {profile["persona"]}.{context_block}
 
@@ -152,6 +158,7 @@ class HighlightFinder:
 Для кожного об'єкта збережи всі поля (start, end, title, reason, viral_score, hashtags).
 Онови viral_score та hashtags на основі фінального рейтингу.
 
+УВАГА: title, reason та hashtags — ТІЛЬКИ українською мовою! Перепиши англійські поля українською.
 Поверни ТІЛЬКИ список з {self._top_highlights} об'єктів JSON у тому ж форматі (без пояснень)."""
 
     def reduce_highlights(
@@ -171,13 +178,40 @@ class HighlightFinder:
 
     # --- Public API ---
 
+    @staticmethod
+    def _compact_segments(segments: list[dict], max_gap: float = 2.0) -> list[dict]:
+        """Merge adjacent segments into paragraph blocks to reduce LLM token count.
+
+        Segments with a gap <= max_gap seconds are joined into a single entry.
+        Returns: [{"s": start, "e": end, "t": "merged text"}, ...]
+        """
+        if not segments:
+            return []
+        blocks: list[dict] = []
+        cur_start = segments[0]["start"]
+        cur_end = segments[0]["end"]
+        cur_texts = [segments[0]["text"].strip()]
+
+        for seg in segments[1:]:
+            if seg["start"] - cur_end <= max_gap:
+                cur_end = seg["end"]
+                cur_texts.append(seg["text"].strip())
+            else:
+                blocks.append({"s": round(cur_start, 1), "e": round(cur_end, 1), "t": " ".join(cur_texts)})
+                cur_start = seg["start"]
+                cur_end = seg["end"]
+                cur_texts = [seg["text"].strip()]
+
+        blocks.append({"s": round(cur_start, 1), "e": round(cur_end, 1), "t": " ".join(cur_texts)})
+        return blocks
+
     def find_highlights(
         self,
         segments: list[dict],
         target_audience: str | None = None,
         description: str | None = None,
     ) -> list[dict]:
-        """Run full map-reduce pipeline: split segments, map, reduce."""
+        """Run full map-reduce pipeline: split segments, map in parallel, reduce."""
         logger.info(
             "Starting highlight detection — audience: %s, description: %s",
             target_audience or _DEFAULT_AUDIENCE,
@@ -186,8 +220,16 @@ class HighlightFinder:
         chunks = self._split_segments(segments, self._map_chunks)
 
         all_candidates: list[dict] = []
-        for i, chunk in enumerate(chunks):
-            all_candidates.extend(self.map_highlights(chunk, i + 1, target_audience, description))
+        with ThreadPoolExecutor(max_workers=len(chunks)) as pool:
+            futures = {
+                pool.submit(self.map_highlights, chunk, i + 1, target_audience, description): i
+                for i, chunk in enumerate(chunks)
+            }
+            for future in as_completed(futures):
+                try:
+                    all_candidates.extend(future.result())
+                except Exception:
+                    logger.exception("MAP chunk %d failed", futures[future])
 
         if not all_candidates:
             logger.warning("No candidates found in any chunk")
@@ -197,6 +239,15 @@ class HighlightFinder:
 
     @staticmethod
     def _split_segments(segments: list[dict], num_chunks: int) -> list[list[dict]]:
-        avg_len = max(1, len(segments) // num_chunks)
-        return [segments[i : i + avg_len] for i in range(0, len(segments), avg_len)]
+        """Split segments into exactly num_chunks roughly equal parts."""
+        n = len(segments)
+        num_chunks = min(num_chunks, n)
+        k, remainder = divmod(n, num_chunks)
+        chunks: list[list[dict]] = []
+        start = 0
+        for i in range(num_chunks):
+            end = start + k + (1 if i < remainder else 0)
+            chunks.append(segments[start:end])
+            start = end
+        return chunks
 

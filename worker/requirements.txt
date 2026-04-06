@@ -1,7 +1,4 @@
-openai-whisper
-moviepy==1.0.3
-torch
-decorator
+faster-whisper
 requests
 confluent-kafka
 minio

@@ -16,8 +16,8 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download the Whisper 'tiny' model to speed up execution
-RUN python -c "import whisper; whisper.load_model('tiny')"
+# Pre-download the faster-whisper 'small' model to speed up execution
+RUN python -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='int8')"
 
 # We don't COPY the script here because we will mount the folder via docker-compose.
 # This allows you to edit the script and see video outputs without rebuilding.
