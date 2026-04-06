@@ -11,10 +11,19 @@ namespace ShoMark.Api.Controllers;
 public class CampaignsController : ControllerBase
 {
     private readonly ICampaignService _campaignService;
+    private readonly ICurrentUserAccessor _currentUser;
 
-    public CampaignsController(ICampaignService campaignService)
+    public CampaignsController(ICampaignService campaignService, ICurrentUserAccessor currentUser)
     {
         _campaignService = campaignService;
+        _currentUser = currentUser;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetMyCampaigns(CancellationToken ct)
+    {
+        var result = await _campaignService.GetByUserIdAsync(_currentUser.UserId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.Error, result.ErrorCode });
     }
 
     [HttpGet("{id:guid}")]
@@ -22,13 +31,6 @@ public class CampaignsController : ControllerBase
     {
         var result = await _campaignService.GetByIdAsync(id, ct);
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.Error, result.ErrorCode });
-    }
-
-    [HttpGet("user/{userId:guid}")]
-    public async Task<IActionResult> GetByUserId(Guid userId, CancellationToken ct)
-    {
-        var result = await _campaignService.GetByUserIdAsync(userId, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.Error, result.ErrorCode });
     }
 
     [HttpGet("video/{videoId:guid}")]

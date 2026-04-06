@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+using ShoMark.Api.Services;
+using ShoMark.Application.Interfaces;
 using ShoMark.Infrastructure.Data;
 using ShoMark.Infrastructure.DependencyInjection;
 
@@ -9,6 +11,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplicationServices();
+
+// Current user accessor (reads JWT claims from HttpContext)
+builder.Services.AddScoped<ICurrentUserAccessor, HttpContextCurrentUserAccessor>();
 
 builder.Services.AddOpenApi();
 

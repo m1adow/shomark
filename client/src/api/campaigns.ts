@@ -8,11 +8,11 @@ import type {
 const PATH = '/campaigns';
 
 export const campaignsApi = {
+  getAll: (signal?: AbortSignal) =>
+    get<CampaignDto[]>(PATH, signal),
+
   getById: (id: string, signal?: AbortSignal) =>
     get<CampaignDto>(`${PATH}/${id}`, signal),
-
-  getByUserId: (userId: string, signal?: AbortSignal) =>
-    get<CampaignDto[]>(`${PATH}/user/${userId}`, signal),
 
   create: (req: CreateCampaignRequest, signal?: AbortSignal) =>
     post<CampaignDto>(PATH, req, signal),

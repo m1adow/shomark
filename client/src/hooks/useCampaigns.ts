@@ -10,10 +10,10 @@ export function useCampaign(id: string) {
   );
 }
 
-export function useUserCampaigns(userId: string) {
+export function useMyCampaigns() {
   return useApiQuery(
-    (signal) => campaignsApi.getByUserId(userId, signal),
-    [userId],
+    (signal) => campaignsApi.getAll(signal),
+    [],
   );
 }
 

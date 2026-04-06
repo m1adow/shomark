@@ -6,39 +6,28 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ShoMark.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class Initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "tags",
+                name: "platforms",
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    slug = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    platform_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    account_name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    access_token = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    refresh_token = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    token_expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_tags", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "users",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    email = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_users", x => x.id);
+                    table.PrimaryKey("PK_platforms", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -58,31 +47,6 @@ namespace ShoMark.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_videos", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "platforms",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    platform_type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    account_name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
-                    access_token = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
-                    refresh_token = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
-                    token_expires_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_platforms", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_platforms_users_user_id",
-                        column: x => x.user_id,
-                        principalTable: "users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -138,41 +102,11 @@ namespace ShoMark.Infrastructure.Migrations
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
-                        name: "FK_campaigns_users_user_id",
-                        column: x => x.user_id,
-                        principalTable: "users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
                         name: "FK_campaigns_videos_video_id",
                         column: x => x.video_id,
                         principalTable: "videos",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "fragment_tags",
-                columns: table => new
-                {
-                    fragment_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    tag_id = table.Column<Guid>(type: "uuid", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_fragment_tags", x => new { x.fragment_id, x.tag_id });
-                    table.ForeignKey(
-                        name: "FK_fragment_tags_ai_fragments_fragment_id",
-                        column: x => x.fragment_id,
-                        principalTable: "ai_fragments",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_fragment_tags_tags_tag_id",
-                        column: x => x.tag_id,
-                        principalTable: "tags",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -267,16 +201,6 @@ namespace ShoMark.Infrastructure.Migrations
                 column: "video_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_fragment_tags_fragment_id",
-                table: "fragment_tags",
-                column: "fragment_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_fragment_tags_tag_id",
-                table: "fragment_tags",
-                column: "tag_id");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_platforms_token_expires_at",
                 table: "platforms",
                 column: "token_expires_at");
@@ -312,24 +236,6 @@ namespace ShoMark.Infrastructure.Migrations
                 column: "status");
 
             migrationBuilder.CreateIndex(
-                name: "IX_tags_name",
-                table: "tags",
-                column: "name",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_tags_slug",
-                table: "tags",
-                column: "slug",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_users_email",
-                table: "users",
-                column: "email",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "IX_videos_minio_key",
                 table: "videos",
                 column: "minio_key",
@@ -343,13 +249,7 @@ namespace ShoMark.Infrastructure.Migrations
                 name: "analytics");
 
             migrationBuilder.DropTable(
-                name: "fragment_tags");
-
-            migrationBuilder.DropTable(
                 name: "posts");
-
-            migrationBuilder.DropTable(
-                name: "tags");
 
             migrationBuilder.DropTable(
                 name: "campaigns");
@@ -359,9 +259,6 @@ namespace ShoMark.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "ai_fragments");
-
-            migrationBuilder.DropTable(
-                name: "users");
 
             migrationBuilder.DropTable(
                 name: "videos");

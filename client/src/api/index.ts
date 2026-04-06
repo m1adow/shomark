@@ -4,7 +4,5 @@ export { campaignsApi } from './campaigns';
 export { fragmentsApi } from './fragments';
 export { platformsApi } from './platforms';
 export { postsApi } from './posts';
-export { tagsApi } from './tags';
-export { usersApi } from './users';
 export { videosApi } from './videos';
 export type * from './types';

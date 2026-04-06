@@ -11,10 +11,19 @@ namespace ShoMark.Api.Controllers;
 public class PlatformsController : ControllerBase
 {
     private readonly IPlatformService _platformService;
+    private readonly ICurrentUserAccessor _currentUser;
 
-    public PlatformsController(IPlatformService platformService)
+    public PlatformsController(IPlatformService platformService, ICurrentUserAccessor currentUser)
     {
         _platformService = platformService;
+        _currentUser = currentUser;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetMyPlatforms(CancellationToken ct)
+    {
+        var result = await _platformService.GetByUserIdAsync(_currentUser.UserId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.Error, result.ErrorCode });
     }
 
     [HttpGet("{id:guid}")]
@@ -22,13 +31,6 @@ public class PlatformsController : ControllerBase
     {
         var result = await _platformService.GetByIdAsync(id, ct);
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.Error, result.ErrorCode });
-    }
-
-    [HttpGet("user/{userId:guid}")]
-    public async Task<IActionResult> GetByUserId(Guid userId, CancellationToken ct)
-    {
-        var result = await _platformService.GetByUserIdAsync(userId, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.Error, result.ErrorCode });
     }
 
     [HttpPost]

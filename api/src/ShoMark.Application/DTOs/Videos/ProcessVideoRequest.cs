@@ -1,3 +1,5 @@
+using ShoMark.Domain.Enums;
+
 namespace ShoMark.Application.DTOs.Videos;
 
 /// <summary>
@@ -5,4 +7,6 @@ namespace ShoMark.Application.DTOs.Videos;
 /// </summary>
 public record ProcessVideoRequest(
     string? OutputBucket,
-    string? OutputPrefix);
+    string? OutputPrefix,
+    TargetAudience? TargetAudience,
+    string? Description);

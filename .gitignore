@@ -142,6 +142,7 @@ TestResult.xml
 *.pidb
 *.svclog
 *.scc
+launchSettings.json
 
 # ===========================
 # Node.js / React

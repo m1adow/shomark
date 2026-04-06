@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ShoMark.Application.Common;
+using ShoMark.Application.Interfaces;
 using ShoMark.Domain.Entities;
 using ShoMark.Domain.Interfaces;
 
@@ -36,15 +37,18 @@ public class KafkaCompletionConsumer : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly KafkaOptions _options;
     private readonly ILogger<KafkaCompletionConsumer> _logger;
+    private readonly IVideoProcessingNotifier _notifier;
 
     public KafkaCompletionConsumer(
         IServiceScopeFactory scopeFactory,
         IOptions<KafkaOptions> options,
-        ILogger<KafkaCompletionConsumer> logger)
+        ILogger<KafkaCompletionConsumer> logger,
+        IVideoProcessingNotifier notifier)
     {
         _scopeFactory = scopeFactory;
         _options = options.Value;
         _logger = logger;
+        _notifier = notifier;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -101,8 +105,10 @@ public class KafkaCompletionConsumer : BackgroundService
         using var doc = JsonDocument.Parse(messageValue);
         var root = doc.RootElement;
 
+        var videoBucket = root.GetProperty("video_bucket").GetString()!;
         var videoKey = root.GetProperty("video_key").GetString()!;
         var outputBucket = root.GetProperty("output_bucket").GetString()!;
+        var minioKey = $"{videoBucket}/{videoKey}";
 
         _logger.LogInformation("Processing completion for video: {VideoKey}", videoKey);
 
@@ -115,10 +121,9 @@ public class KafkaCompletionConsumer : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var videoRepo = scope.ServiceProvider.GetRequiredService<IVideoRepository>();
         var fragmentRepo = scope.ServiceProvider.GetRequiredService<IAiFragmentRepository>();
-        var tagRepo = scope.ServiceProvider.GetRequiredService<ITagRepository>();
 
         // Find the source video by MinIO key
-        var video = await videoRepo.GetByMinioKeyAsync(videoKey, ct);
+        var video = await videoRepo.GetByMinioKeyAsync(minioKey, ct);
         if (video is null)
         {
             _logger.LogWarning("Video not found for key {VideoKey} — skipping", videoKey);
@@ -131,6 +136,10 @@ public class KafkaCompletionConsumer : BackgroundService
             var title = highlight.TryGetProperty("title", out var titleEl) ? titleEl.GetString() : null;
             var start = highlight.GetProperty("start").GetDouble();
             var end = highlight.GetProperty("end").GetDouble();
+            var previewKey = highlight.TryGetProperty("preview_key", out var prevEl) ? prevEl.GetString() : null;
+            var viralScore = highlight.TryGetProperty("viral_score", out var vsEl) && vsEl.ValueKind == JsonValueKind.Number
+                ? vsEl.GetDouble() : (double?)null;
+            var hashtags = highlight.TryGetProperty("hashtags", out var htEl) ? htEl.GetString() : null;
 
             var fragment = new AiFragment
             {
@@ -138,22 +147,11 @@ public class KafkaCompletionConsumer : BackgroundService
                 Description = title,
                 StartTime = start,
                 EndTime = end,
-                MinioKey = $"{outputBucket}/{clipKey}"
+                MinioKey = $"{outputBucket}/{clipKey}",
+                ThumbnailKey = previewKey is not null ? $"{outputBucket}/{previewKey}" : null,
+                ViralScore = viralScore,
+                Hashtags = hashtags,
             };
-
-            // Auto-tag with a "ai-generated" tag
-            var slug = "ai-generated";
-            var tag = await tagRepo.GetBySlugAsync(slug, ct);
-            if (tag is null)
-            {
-                tag = new Tag { Name = "AI Generated", Slug = slug };
-                tag = await tagRepo.AddAsync(tag, ct);
-            }
-
-            fragment.FragmentTags.Add(new FragmentTag
-            {
-                TagId = tag.Id
-            });
 
             await fragmentRepo.AddAsync(fragment, ct);
 
@@ -165,5 +163,13 @@ public class KafkaCompletionConsumer : BackgroundService
         _logger.LogInformation(
             "Completed processing {Count} highlights for video {VideoKey}",
             highlightsElement.GetArrayLength(), videoKey);
+
+        // Notify SSE subscribers that fragments are ready
+        var ssePayload = JsonSerializer.Serialize(new
+        {
+            videoId = video.Id,
+            highlightCount = highlightsElement.GetArrayLength(),
+        });
+        await _notifier.PublishAsync(video.Id, ssePayload);
     }
 }

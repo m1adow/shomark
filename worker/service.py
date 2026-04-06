@@ -49,6 +49,8 @@ class VideoHighlightService:
         video_key = message["video_key"]
         output_bucket = message.get("output_bucket", "highlights")
         output_prefix = message.get("output_prefix", "")
+        target_audience = message.get("target_audience")
+        description = message.get("description")
 
         work_dir = f"/tmp/work/{os.path.basename(video_key)}"
         local_video = os.path.join(work_dir, "source.mp4")
@@ -64,7 +66,11 @@ class VideoHighlightService:
 
             # 3. Find highlights
             logger.info("=== Step 3/5: Finding highlights (LLM map-reduce) ===")
-            highlights = self._highlight_finder.find_highlights(segments)
+            highlights = self._highlight_finder.find_highlights(
+                segments,
+                target_audience=target_audience,
+                description=description,
+            )
             if not highlights:
                 logger.warning("No highlights found, skipping video: %s", video_key)
                 return None
@@ -97,6 +103,8 @@ class VideoHighlightService:
                 metadata = {
                     "title": clip["title"],
                     "reason": clip["reason"],
+                    "viral_score": clip.get("viral_score"),
+                    "hashtags": clip.get("hashtags"),
                     "start": clip["start"],
                     "end": clip["end"],
                     "transcript": transcript_text,
@@ -110,6 +118,8 @@ class VideoHighlightService:
                     "preview_key": preview_key,
                     "meta_key": meta_key,
                     "title": clip["title"],
+                    "viral_score": clip.get("viral_score"),
+                    "hashtags": clip.get("hashtags"),
                     "start": clip["start"],
                     "end": clip["end"],
                 })

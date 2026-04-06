@@ -13,7 +13,6 @@ public class Campaign : BaseEntity
     public CampaignStatus Status { get; set; } = CampaignStatus.Draft;
 
     // Navigation
-    public User User { get; set; } = null!;
     public AiFragment? Fragment { get; set; }
     public Video? Video { get; set; }
     public ICollection<Post> Posts { get; set; } = [];

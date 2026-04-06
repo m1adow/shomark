@@ -7,13 +7,12 @@ import { useCreateCampaign, useUpdateCampaign } from '../../hooks/useCampaigns';
 import { useUploadVideo, useProcessVideo, useVideoUrl } from '../../hooks/useVideos';
 import { useVideoFragments, useUpdateFragment } from '../../hooks/useFragments';
 import { useCreatePost, useCampaignPosts, useScheduledPostsInRange } from '../../hooks/usePosts';
-import { useUserPlatforms } from '../../hooks/usePlatforms';
+import { useMyPlatforms } from '../../hooks/usePlatforms';
+import { useVideoProcessingEvents } from '../../hooks/useVideoProcessingEvents';
 import StepCampaignSetup, { type CampaignSetupData } from './StepCampaignSetup';
 import StepAiReview from './StepAiReview';
 import StepSchedulePublish from './StepSchedulePublish';
 import type { CampaignDto } from '../../api/types';
-
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 const stepItems = [
   { label: 'Campaign Setup' },
@@ -66,8 +65,23 @@ export default function CreateCampaignPage() {
 
   const [regenerating, setRegenerating] = useState(false);
 
+  // ── SSE: auto-refetch fragments when worker completes ──────────────────
+  useVideoProcessingEvents(
+    activeStep >= 1 ? videoId : null,
+    useCallback(() => {
+      refetchFragments();
+      setRegenerating(false);
+      toast.current?.show({
+        severity: 'success',
+        summary: 'AI Processing Complete',
+        detail: 'Video highlights are ready for review.',
+        life: 4000,
+      });
+    }, [refetchFragments]),
+  );
+
   // ── Step 3 queries ─────────────────────────────────────────────────────
-  const { data: platforms, loading: platformsLoading } = useUserPlatforms(DEMO_USER_ID);
+  const { data: platforms, loading: platformsLoading } = useMyPlatforms();
 
   const {
     data: campaignPosts,
@@ -98,7 +112,6 @@ export default function CreateCampaignPage() {
 
       // 2. Create campaign
       const camp = await createCampaign({
-        userId: DEMO_USER_ID,
         videoId: video.id,
         name: setupData.name,
         targetAudience: setupData.targetAudience ?? undefined,
@@ -108,7 +121,10 @@ export default function CreateCampaignPage() {
       setUploadProgress(70);
 
       // 3. Trigger AI processing
-      await processVideo(video.id, {});
+      await processVideo(video.id, {
+        targetAudience: setupData.targetAudience ?? undefined,
+        description: setupData.description || undefined,
+      });
       setUploadProgress(100);
 
       toast.current?.show({

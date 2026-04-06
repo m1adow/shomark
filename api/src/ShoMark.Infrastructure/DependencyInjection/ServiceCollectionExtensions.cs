@@ -28,16 +28,18 @@ public static class ServiceCollectionExtensions
         // Repositories
         services.AddScoped<IVideoRepository, VideoRepository>();
         services.AddScoped<IAiFragmentRepository, AiFragmentRepository>();
-        services.AddScoped<ITagRepository, TagRepository>();
         services.AddScoped<IPostRepository, PostRepository>();
         services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
-        services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IPlatformRepository, PlatformRepository>();
         services.AddScoped<ICampaignRepository, CampaignRepository>();
+
+        // HttpContext accessor (required by CurrentUserAccessor)
+        services.AddHttpContextAccessor();
 
         // Kafka
         services.Configure<KafkaOptions>(configuration.GetSection(KafkaOptions.SectionName));
         services.AddSingleton<IVideoProcessingProducer, KafkaVideoProcessingProducer>();
+        services.AddSingleton<IVideoProcessingNotifier, VideoProcessingNotifier>();
         services.AddHostedService<KafkaCompletionConsumer>();
 
         // MinIO Storage
@@ -61,6 +63,21 @@ public static class ServiceCollectionExtensions
                         : keycloakOptions.ValidIssuer;
 
                 options.TokenValidationParameters.ValidateAudience = false;
+
+                // Allow SSE (EventSource) to pass JWT via query string
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        if (context.Request.Path.StartsWithSegments("/api/videos")
+                            && context.Request.Path.Value?.EndsWith("/events") == true
+                            && context.Request.Query.TryGetValue("access_token", out var token))
+                        {
+                            context.Token = token;
+                        }
+                        return Task.CompletedTask;
+                    }
+                };
             });
 
         services.AddAuthorization();
@@ -72,10 +89,8 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<IVideoService, VideoService>();
         services.AddScoped<IAiFragmentService, AiFragmentService>();
-        services.AddScoped<ITagService, TagService>();
         services.AddScoped<IPostService, PostService>();
         services.AddScoped<IAnalyticsService, AnalyticsService>();
-        services.AddScoped<IUserService, UserService>();
         services.AddScoped<IPlatformService, PlatformService>();
         services.AddScoped<ICampaignService, CampaignService>();
 

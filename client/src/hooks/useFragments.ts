@@ -48,21 +48,3 @@ export function useDeleteFragment() {
     useCallback((id: string) => fragmentsApi.delete(id), []),
   );
 }
-
-export function useAddTagToFragment() {
-  return useApiMutation(
-    useCallback(
-      (fragmentId: string, tagId: string) => fragmentsApi.addTag(fragmentId, tagId),
-      [],
-    ),
-  );
-}
-
-export function useRemoveTagFromFragment() {
-  return useApiMutation(
-    useCallback(
-      (fragmentId: string, tagId: string) => fragmentsApi.removeTag(fragmentId, tagId),
-      [],
-    ),
-  );
-}

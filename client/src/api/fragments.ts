@@ -26,10 +26,4 @@ export const fragmentsApi = {
 
   delete: (id: string, signal?: AbortSignal) =>
     del(`${PATH}/${id}`, signal),
-
-  addTag: (fragmentId: string, tagId: string, signal?: AbortSignal) =>
-    post<void>(`${PATH}/${fragmentId}/tags/${tagId}`, undefined, signal),
-
-  removeTag: (fragmentId: string, tagId: string, signal?: AbortSignal) =>
-    del(`${PATH}/${fragmentId}/tags/${tagId}`, signal),
 };

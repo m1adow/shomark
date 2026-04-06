@@ -9,11 +9,8 @@ public class ShoMarkDbContext : DbContext
 
     public DbSet<Video> Videos => Set<Video>();
     public DbSet<AiFragment> AiFragments => Set<AiFragment>();
-    public DbSet<Tag> Tags => Set<Tag>();
-    public DbSet<FragmentTag> FragmentTags => Set<FragmentTag>();
     public DbSet<Post> Posts => Set<Post>();
     public DbSet<Analytics> Analytics => Set<Analytics>();
-    public DbSet<User> Users => Set<User>();
     public DbSet<Platform> Platforms => Set<Platform>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
 

@@ -13,7 +13,7 @@ interface AuthContextValue {
   initialized: boolean;
   authenticated: boolean;
   token: string | undefined;
-  user: { name: string; email: string; preferred_username: string } | null;
+  user: { id: string; name: string; email: string; preferred_username: string } | null;
   login: () => void;
   logout: () => void;
 }
@@ -84,6 +84,7 @@ function parseUser(kc: Keycloak) {
   const parsed = kc.tokenParsed;
   if (!parsed) return null;
   return {
+    id: (parsed as Record<string, string>)['sub'] ?? '',
     name: (parsed as Record<string, string>)['name'] ?? '',
     email: (parsed as Record<string, string>)['email'] ?? '',
     preferred_username: (parsed as Record<string, string>)['preferred_username'] ?? '',

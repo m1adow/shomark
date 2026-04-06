@@ -44,7 +44,6 @@ public class AiFragmentService : IAiFragmentService
             fragment.StartTime, fragment.EndTime, fragment.MinioKey,
             fragment.ViralScore, fragment.Hashtags, fragment.ThumbnailKey,
             fragment.IsApproved, fragment.CreatedAt,
-            fragment.FragmentTags.Select(ft => new TagSummaryDto(ft.Tag.Id, ft.Tag.Name, ft.Tag.Slug)).ToList(),
             fragment.Posts.Select(p => new PostSummaryDto(p.Id, p.Title, p.Status.ToString())).ToList());
 
         return Result<AiFragmentDetailDto>.Success(dto);
@@ -70,13 +69,6 @@ public class AiFragmentService : IAiFragmentService
             Hashtags = request.Hashtags,
             ThumbnailKey = request.ThumbnailKey
         };
-
-        if (request.TagIds?.Count > 0)
-        {
-            fragment.FragmentTags = request.TagIds
-                .Select(id => new FragmentTag { TagId = Guid.Parse(id) })
-                .ToList();
-        }
 
         var created = await _fragmentRepository.AddAsync(fragment, ct);
         return Result<AiFragmentDto>.Success(MapToDto(created));
@@ -110,35 +102,6 @@ public class AiFragmentService : IAiFragmentService
             return Result<bool>.Failure("Fragment not found", "NOT_FOUND");
 
         await _fragmentRepository.DeleteAsync(id, ct);
-        return Result<bool>.Success(true);
-    }
-
-    public async Task<Result<bool>> AddTagAsync(Guid fragmentId, Guid tagId, CancellationToken ct = default)
-    {
-        var fragment = await _fragmentRepository.GetWithDetailsAsync(fragmentId, ct);
-        if (fragment is null)
-            return Result<bool>.Failure("Fragment not found", "NOT_FOUND");
-
-        if (fragment.FragmentTags.Any(ft => ft.TagId == tagId))
-            return Result<bool>.Failure("Tag already assigned", "DUPLICATE");
-
-        fragment.FragmentTags.Add(new FragmentTag { FragmentId = fragmentId, TagId = tagId });
-        await _fragmentRepository.UpdateAsync(fragment, ct);
-        return Result<bool>.Success(true);
-    }
-
-    public async Task<Result<bool>> RemoveTagAsync(Guid fragmentId, Guid tagId, CancellationToken ct = default)
-    {
-        var fragment = await _fragmentRepository.GetWithDetailsAsync(fragmentId, ct);
-        if (fragment is null)
-            return Result<bool>.Failure("Fragment not found", "NOT_FOUND");
-
-        var ft = fragment.FragmentTags.FirstOrDefault(ft => ft.TagId == tagId);
-        if (ft is null)
-            return Result<bool>.Failure("Tag not assigned", "NOT_FOUND");
-
-        fragment.FragmentTags.Remove(ft);
-        await _fragmentRepository.UpdateAsync(fragment, ct);
         return Result<bool>.Success(true);
     }
 

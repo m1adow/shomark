@@ -4,11 +4,9 @@ import { Column } from 'primereact/column';
 import { Tag } from 'primereact/tag';
 import { ProgressSpinner } from 'primereact/progressspinner';
 import { useVideos } from '../hooks/useVideos';
-import { useTags } from '../hooks/useTags';
 
 export default function DashboardPage() {
   const { data: videos, loading: videosLoading, error: videosError } = useVideos();
-  const { data: tags, loading: tagsLoading } = useTags();
 
   return (
     <div>
@@ -20,12 +18,6 @@ export default function DashboardPage() {
           <div className="text-sm text-gray-500">Total Videos</div>
           <div className="text-3xl font-bold text-gray-900 mt-1">
             {videosLoading ? '—' : (videos?.length ?? 0)}
-          </div>
-        </Card>
-        <Card className="shadow-sm">
-          <div className="text-sm text-gray-500">Tags Created</div>
-          <div className="text-3xl font-bold text-gray-900 mt-1">
-            {tagsLoading ? '—' : (tags?.length ?? 0)}
           </div>
         </Card>
         <Card className="shadow-sm">

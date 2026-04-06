@@ -15,7 +15,6 @@ public record CampaignDto(
     DateTime UpdatedAt);
 
 public record CreateCampaignRequest(
-    Guid UserId,
     Guid? FragmentId,
     Guid? VideoId,
     string? Name,

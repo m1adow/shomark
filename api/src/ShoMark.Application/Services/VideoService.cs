@@ -119,11 +119,13 @@ public class VideoService : IVideoService
         var outputPrefix = request.OutputPrefix ?? $"{video.Id}/";
 
         await _processingProducer.SendProcessingRequestAsync(
-            videoBucket, videoKey, outputBucket, outputPrefix, ct);
+            videoBucket, videoKey, outputBucket, outputPrefix,
+            request.TargetAudience, request.Description, ct);
 
         return Result<bool>.Success(true);
     }
 
+    //TODO: make all map methods with static extension methods in a separate class
     private static VideoDto MapToDto(Video v) => new(
         v.Id, v.Title, v.MinioKey, v.OriginalFileName,
         v.DurationSeconds, v.FileSize, v.CreatedAt, v.UpdatedAt);

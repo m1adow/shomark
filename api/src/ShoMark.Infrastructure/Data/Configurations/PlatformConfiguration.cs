@@ -22,11 +22,6 @@ public class PlatformConfiguration : IEntityTypeConfiguration<Platform>
         builder.Property(p => p.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
         builder.Property(p => p.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
 
-        builder.HasOne(p => p.User)
-            .WithMany(u => u.Platforms)
-            .HasForeignKey(p => p.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
-
         builder.HasIndex(p => p.UserId);
         builder.HasIndex(p => p.TokenExpiresAt);
     }
