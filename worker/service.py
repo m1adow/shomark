@@ -2,6 +2,7 @@ import json
 import os
 import logging
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 
 from storage import StorageClient
 from transcriber import Transcriber
@@ -82,47 +83,49 @@ class VideoHighlightService:
             # 5. Upload
             logger.info("=== Step 5/5: Uploading %d clips ===", len(clips))
             uploaded_clips: list[dict] = []
-            for clip in clips:
-                clip_name = os.path.basename(clip["path"])
-                clip_key = f"{output_prefix}{clip_name}"
 
-                # Upload video clip
-                self._storage.upload_file(output_bucket, clip_key, clip["path"], content_type="video/mp4")
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                for clip in clips:
+                    clip_name = os.path.basename(clip["path"])
+                    clip_key = f"{output_prefix}{clip_name}"
 
-                # Upload preview image
-                preview_name = os.path.basename(clip["preview_path"])
-                preview_key = f"{output_prefix}{preview_name}"
-                self._storage.upload_file(output_bucket, preview_key, clip["preview_path"], content_type="image/jpeg")
+                    # Upload vertical (9:16) video clip
+                    pool.submit(self._storage.upload_file, output_bucket, clip_key, clip["path"], "video/mp4")
 
-                # Extract original transcript text for this clip's time range
-                transcript_text = self._extract_text(segments, clip["start"], clip["end"])
+                    # Upload preview image
+                    preview_name = os.path.basename(clip["preview_path"])
+                    preview_key = f"{output_prefix}{preview_name}"
+                    pool.submit(self._storage.upload_file, output_bucket, preview_key, clip["preview_path"], "image/jpeg")
 
-                # Upload metadata alongside
-                meta_key = f"{clip_key}.json"
-                meta_path = f"{clip['path']}.json"
-                metadata = {
-                    "title": clip["title"],
-                    "reason": clip["reason"],
-                    "viral_score": clip.get("viral_score"),
-                    "hashtags": clip.get("hashtags"),
-                    "start": clip["start"],
-                    "end": clip["end"],
-                    "transcript": transcript_text,
-                }
-                with open(meta_path, "w", encoding="utf-8") as f:
-                    json.dump(metadata, f, ensure_ascii=False, indent=2)
-                self._storage.upload_file(output_bucket, meta_key, meta_path, content_type="application/json")
+                    # Extract original transcript text for this clip's time range
+                    transcript_text = self._extract_text(segments, clip["start"], clip["end"])
 
-                uploaded_clips.append({
-                    "key": clip_key,
-                    "preview_key": preview_key,
-                    "meta_key": meta_key,
-                    "title": clip["title"],
-                    "viral_score": clip.get("viral_score"),
-                    "hashtags": clip.get("hashtags"),
-                    "start": clip["start"],
-                    "end": clip["end"],
-                })
+                    # Upload metadata
+                    meta_key = f"{clip_key}.json"
+                    meta_path = f"{clip['path']}.json"
+                    metadata = {
+                        "title": clip["title"],
+                        "reason": clip["reason"],
+                        "viral_score": clip.get("viral_score"),
+                        "hashtags": clip.get("hashtags"),
+                        "start": clip["start"],
+                        "end": clip["end"],
+                        "transcript": transcript_text,
+                    }
+                    with open(meta_path, "w", encoding="utf-8") as f:
+                        json.dump(metadata, f, ensure_ascii=False, indent=2)
+                    pool.submit(self._storage.upload_file, output_bucket, meta_key, meta_path, "application/json")
+
+                    uploaded_clips.append({
+                        "key": clip_key,
+                        "preview_key": preview_key,
+                        "meta_key": meta_key,
+                        "title": clip["title"],
+                        "viral_score": clip.get("viral_score"),
+                        "hashtags": clip.get("hashtags"),
+                        "start": clip["start"],
+                        "end": clip["end"],
+                    })
 
             logger.info("=== Done: %s -> %d highlights uploaded ===", video_key, len(clips))
 

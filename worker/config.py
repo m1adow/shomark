@@ -24,6 +24,9 @@ class Config:
 
     # Processing
     clip_duration: int = int(os.getenv("CLIP_DURATION", "60"))
-    whisper_model: str = os.getenv("WHISPER_MODEL", "tiny")
+    whisper_model: str = os.getenv("WHISPER_MODEL", "base")
+    whisper_device: str = os.getenv("WHISPER_DEVICE", "cpu")
+    whisper_compute_type: str = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
+    whisper_beam_size: int = int(os.getenv("WHISPER_BEAM_SIZE", "1"))
     map_chunks: int = int(os.getenv("MAP_CHUNKS", "3"))
     top_highlights: int = int(os.getenv("TOP_HIGHLIGHTS", "3"))
