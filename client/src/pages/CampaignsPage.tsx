@@ -37,7 +37,22 @@ export default function CampaignsPage() {
             <ProgressSpinner style={{ width: '40px', height: '40px' }} />
           </div>
         ) : (
-          <DataTable value={campaigns ?? []} paginator rows={10} emptyMessage="No campaigns found.">
+          <DataTable
+            value={campaigns ?? []}
+            paginator
+            rows={10}
+            emptyMessage="No campaigns found."
+            selectionMode="single"
+            onRowSelect={(e) => {
+              const row = e.data as CampaignDto;
+              if (row.status === 'Draft') {
+                navigate(`/campaigns/${row.id}/edit`);
+              } else {
+                navigate(`/campaigns/${row.id}`);
+              }
+            }}
+            rowClassName={() => 'cursor-pointer'}
+          >
             <Column field="name" header="Name" sortable body={(row: CampaignDto) => row.name ?? 'Untitled'} />
             <Column
               field="status"

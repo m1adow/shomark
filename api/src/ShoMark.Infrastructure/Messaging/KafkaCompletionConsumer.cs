@@ -38,17 +38,20 @@ public class KafkaCompletionConsumer : BackgroundService
     private readonly KafkaOptions _options;
     private readonly ILogger<KafkaCompletionConsumer> _logger;
     private readonly IVideoProcessingNotifier _notifier;
+    private readonly INotificationSseNotifier _notificationNotifier;
 
     public KafkaCompletionConsumer(
         IServiceScopeFactory scopeFactory,
         IOptions<KafkaOptions> options,
         ILogger<KafkaCompletionConsumer> logger,
-        IVideoProcessingNotifier notifier)
+        IVideoProcessingNotifier notifier,
+        INotificationSseNotifier notificationNotifier)
     {
         _scopeFactory = scopeFactory;
         _options = options.Value;
         _logger = logger;
         _notifier = notifier;
+        _notificationNotifier = notificationNotifier;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -171,5 +174,26 @@ public class KafkaCompletionConsumer : BackgroundService
             highlightCount = highlightsElement.GetArrayLength(),
         });
         await _notifier.PublishAsync(video.Id, ssePayload);
+
+        // Create persistent notifications for users who own campaigns linked to this video
+        var campaignRepo = scope.ServiceProvider.GetRequiredService<ICampaignRepository>();
+        var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
+
+        var campaigns = await campaignRepo.GetByVideoIdAsync(video.Id, ct);
+        var notifiedUserIds = new HashSet<Guid>();
+
+        foreach (var campaign in campaigns)
+        {
+            if (notifiedUserIds.Add(campaign.UserId))
+            {
+                await notificationService.CreateAsync(
+                    campaign.UserId,
+                    Domain.Enums.NotificationType.VideoProcessingCompleted,
+                    $"Video \"{video.Title}\" processed",
+                    $"{highlightsElement.GetArrayLength()} highlights generated",
+                    video.Id,
+                    ct);
+            }
+        }
     }
 }

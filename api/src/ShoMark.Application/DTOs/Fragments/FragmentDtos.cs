@@ -7,7 +7,7 @@ public record AiFragmentDto(
     double StartTime,
     double EndTime,
     string? MinioKey,
-    double? ViralScore,
+    double ViralScore,
     string? Hashtags,
     string? ThumbnailKey,
     bool IsApproved,
@@ -26,8 +26,8 @@ public record CreateAiFragmentRequest(
 
 public record UpdateAiFragmentRequest(
     string? Description,
-    double StartTime,
-    double EndTime,
+    double? StartTime,
+    double? EndTime,
     string? MinioKey,
     double? ViralScore,
     string? Hashtags,
@@ -40,7 +40,7 @@ public record AiFragmentDetailDto(
     double StartTime,
     double EndTime,
     string? MinioKey,
-    double? ViralScore,
+    double ViralScore,
     string? Hashtags,
     string? ThumbnailKey,
     bool IsApproved,

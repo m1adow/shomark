@@ -26,4 +26,7 @@ export const fragmentsApi = {
 
   delete: (id: string, signal?: AbortSignal) =>
     del(`${PATH}/${id}`, signal),
+
+  getThumbnailUrl: (id: string, signal?: AbortSignal) =>
+    get<{ url: string }>(`${PATH}/${id}/thumbnail-url`, signal),
 };

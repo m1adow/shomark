@@ -103,7 +103,7 @@ export interface AiFragmentDto {
   startTime: number;
   endTime: number;
   minioKey: string | null;
-  viralScore: number | null;
+  viralScore: number;
   hashtags: string | null;
   thumbnailKey: string | null;
   isApproved: boolean;
@@ -124,8 +124,8 @@ export interface CreateAiFragmentRequest {
 
 export interface UpdateAiFragmentRequest {
   description?: string;
-  startTime: number;
-  endTime: number;
+  startTime?: number;
+  endTime?: number;
   minioKey?: string;
   viralScore?: number;
   hashtags?: string;
@@ -139,7 +139,7 @@ export interface AiFragmentDetailDto {
   startTime: number;
   endTime: number;
   minioKey: string | null;
-  viralScore: number | null;
+  viralScore: number;
   hashtags: string | null;
   thumbnailKey: string | null;
   isApproved: boolean;
@@ -286,6 +286,27 @@ export interface ProcessVideoRequest {
   outputPrefix?: string;
   targetAudience?: TargetAudience;
   description?: string;
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+export const NotificationType = {
+  VideoProcessingCompleted: 0,
+  PostPublished: 1,
+  PostFailed: 2,
+} as const;
+export type NotificationType =
+  (typeof NotificationType)[keyof typeof NotificationType];
+
+export interface NotificationDto {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string | null;
+  referenceId: string | null;
+  isRead: boolean;
+  createdAt: string;
 }
 
 // ── API Error ────────────────────────────────────────────────────────────────

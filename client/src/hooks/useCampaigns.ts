@@ -3,10 +3,11 @@ import { campaignsApi } from '../api';
 import type { CreateCampaignRequest, UpdateCampaignRequest } from '../api';
 import { useApiQuery, useApiMutation } from './useApi';
 
-export function useCampaign(id: string) {
+export function useCampaign(id: string, enabled = true) {
   return useApiQuery(
     (signal) => campaignsApi.getById(id, signal),
     [id],
+    { enabled },
   );
 }
 

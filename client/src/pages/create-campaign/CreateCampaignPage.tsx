@@ -1,9 +1,9 @@
-import { useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Steps } from 'primereact/steps';
 import { Toast } from 'primereact/toast';
 import { useAuth } from '../../auth';
-import { useCreateCampaign, useUpdateCampaign } from '../../hooks/useCampaigns';
+import { useCreateCampaign, useUpdateCampaign, useCampaign } from '../../hooks/useCampaigns';
 import { useUploadVideo, useProcessVideo, useVideoUrl } from '../../hooks/useVideos';
 import { useVideoFragments, useUpdateFragment } from '../../hooks/useFragments';
 import { useCreatePost, useCampaignPosts, useScheduledPostsInRange } from '../../hooks/usePosts';
@@ -21,6 +21,7 @@ const stepItems = [
 ];
 
 export default function CreateCampaignPage() {
+  const { id: editId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const toast = useRef<Toast>(null);
   useAuth();
@@ -41,6 +42,37 @@ export default function CreateCampaignPage() {
   // Created campaign reference
   const [campaign, setCampaign] = useState<CampaignDto | null>(null);
   const [videoId, setVideoId] = useState<string | null>(null);
+  const [approvedFragmentId, setApprovedFragmentId] = useState<string | null>(null);
+
+  // ── Resume existing draft ──────────────────────────────────────────────
+  const { data: existingCampaign } = useCampaign(editId ?? '', !!editId);
+
+  useEffect(() => {
+    if (!existingCampaign) return;
+
+    setCampaign(existingCampaign);
+    setSetupData((prev) => ({
+      ...prev,
+      name: existingCampaign.name ?? '',
+      description: existingCampaign.description ?? '',
+    }));
+
+    if (existingCampaign.videoId) {
+      setVideoId(existingCampaign.videoId);
+    }
+    if (existingCampaign.fragmentId) {
+      setApprovedFragmentId(existingCampaign.fragmentId);
+    }
+
+    // Determine latest step
+    if (existingCampaign.fragmentId) {
+      setActiveStep(2);
+    } else if (existingCampaign.videoId) {
+      setActiveStep(1);
+    } else {
+      setActiveStep(0);
+    }
+  }, [existingCampaign]);
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const { execute: createCampaign } = useCreateCampaign();
@@ -57,6 +89,16 @@ export default function CreateCampaignPage() {
     error: fragmentsError,
     refetch: refetchFragments,
   } = useVideoFragments(videoId ?? '', !!videoId);
+
+  // When fragments load and one is already approved, jump to step 2
+  useEffect(() => {
+    if (!fragments || fragments.length === 0) return;
+    const approved = fragments.find((f) => f.isApproved);
+    if (approved && !approvedFragmentId) {
+      setApprovedFragmentId(approved.id);
+      setActiveStep(2);
+    }
+  }, [fragments, approvedFragmentId]);
 
   // Workaround: useVideoFragments doesn't support enabled, pass videoId conditionally
   const {
@@ -145,40 +187,53 @@ export default function CreateCampaignPage() {
 
   // ── Step 2: Approve / Update / Regenerate ──────────────────────────────
   const handleApprove = useCallback(
-    async (fragmentId: string, approved: boolean) => {
+    async (fragmentId: string) => {
       try {
-        const frag = fragments?.find((f) => f.id === fragmentId);
-        if (!frag) return;
-        await updateFragment(fragmentId, {
-          description: frag.description ?? undefined,
-          startTime: frag.startTime,
-          endTime: frag.endTime,
-          isApproved: approved,
-        });
-        refetchFragments();
+        await updateFragment(fragmentId, { isApproved: true });
+        setApprovedFragmentId(fragmentId);
+        setActiveStep(2);
       } catch {
-        toast.current?.show({ severity: 'error', summary: 'Failed to update clip', life: 3000 });
+        toast.current?.show({ severity: 'error', summary: 'Failed to approve clip', life: 3000 });
       }
     },
-    [fragments, updateFragment, refetchFragments],
+    [updateFragment],
   );
+
+  const handleBackFromSchedule = useCallback(async () => {
+    if (approvedFragmentId) {
+      try {
+        await updateFragment(approvedFragmentId, { isApproved: false });
+        refetchFragments();
+      } catch {
+        // best-effort
+      }
+      setApprovedFragmentId(null);
+    }
+    setActiveStep(1);
+  }, [approvedFragmentId, updateFragment, refetchFragments]);
 
   const handleUpdateCaption = useCallback(
     async (fragmentId: string, description: string) => {
       try {
-        const frag = fragments?.find((f) => f.id === fragmentId);
-        if (!frag) return;
-        await updateFragment(fragmentId, {
-          description,
-          startTime: frag.startTime,
-          endTime: frag.endTime,
-        });
+        await updateFragment(fragmentId, { description });
         refetchFragments();
       } catch {
         toast.current?.show({ severity: 'error', summary: 'Failed to update caption', life: 3000 });
       }
     },
-    [fragments, updateFragment, refetchFragments],
+    [updateFragment, refetchFragments],
+  );
+
+  const handleUpdateHashtags = useCallback(
+    async (fragmentId: string, hashtags: string) => {
+      try {
+        await updateFragment(fragmentId, { hashtags });
+        refetchFragments();
+      } catch {
+        toast.current?.show({ severity: 'error', summary: 'Failed to update hashtags', life: 3000 });
+      }
+    },
+    [updateFragment, refetchFragments],
   );
 
   const handleRegenerate = useCallback(async () => {
@@ -189,22 +244,36 @@ export default function CreateCampaignPage() {
       toast.current?.show({
         severity: 'info',
         summary: 'Regenerating',
-        detail: 'AI processing restarted. Refresh in a moment.',
+        detail: 'AI is reprocessing your video. Please wait…',
         life: 4000,
       });
-      // Wait a bit then refetch
-      setTimeout(() => {
-        refetchFragments();
-        setRegenerating(false);
-      }, 3000);
+      // SSE callback will set regenerating=false and refetch
     } catch {
       setRegenerating(false);
       toast.current?.show({ severity: 'error', summary: 'Regeneration failed', life: 3000 });
     }
-  }, [videoId, processVideo, refetchFragments]);
+  }, [videoId, processVideo]);
+
+  // ── Save as Draft ──────────────────────────────────────────────────────
+  const handleSaveAsDraft = useCallback(async () => {
+    if (!campaign) return;
+    try {
+      await updateCampaign(campaign.id, { status: 0 });
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Saved',
+        detail: 'Campaign saved as draft.',
+        life: 3000,
+      });
+      navigate('/campaigns');
+    } catch {
+      toast.current?.show({ severity: 'error', summary: 'Failed to save draft', life: 3000 });
+    }
+  }, [campaign, updateCampaign, navigate]);
 
   // ── Step 3: Schedule / Publish ─────────────────────────────────────────
-  const approvedFragments = (fragments ?? []).filter((f) => f.isApproved);
+  const selectedFragment = fragments?.find((f) => f.id === approvedFragmentId);
+  const approvedFragments = selectedFragment ? [selectedFragment] : [];
 
   const handleSchedule = useCallback(
     async (platformIds: string[], scheduledAt: Date) => {
@@ -280,7 +349,9 @@ export default function CreateCampaignPage() {
       <Toast ref={toast} />
 
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Create Campaign</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">
+          {editId ? 'Edit Campaign' : 'Create Campaign'}
+        </h1>
       </div>
 
       <Steps
@@ -309,9 +380,8 @@ export default function CreateCampaignPage() {
           videoUrl={videoUrlData?.url ?? null}
           onApprove={handleApprove}
           onUpdateCaption={handleUpdateCaption}
+          onUpdateHashtags={handleUpdateHashtags}
           onRegenerate={handleRegenerate}
-          onNext={() => setActiveStep(2)}
-          onBack={() => setActiveStep(0)}
           regenerating={regenerating}
         />
       )}
@@ -324,7 +394,8 @@ export default function CreateCampaignPage() {
           scheduledPosts={[...(campaignPosts ?? []), ...(scheduledPosts ?? [])]}
           onSchedule={handleSchedule}
           onPublishNow={handlePublishNow}
-          onBack={() => setActiveStep(1)}
+          onBack={handleBackFromSchedule}
+          onSaveAsDraft={handleSaveAsDraft}
           publishing={publishing}
           publishError={publishError}
         />

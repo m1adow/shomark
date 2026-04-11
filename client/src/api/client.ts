@@ -90,3 +90,13 @@ export async function del<T = void>(path: string, signal?: AbortSignal): Promise
   });
   return handleResponse<T>(res);
 }
+
+export async function patch<T = void>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'PATCH',
+    headers: headers(),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal,
+  });
+  return handleResponse<T>(res);
+}

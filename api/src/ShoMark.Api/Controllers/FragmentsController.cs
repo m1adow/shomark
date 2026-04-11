@@ -61,4 +61,11 @@ public class FragmentsController : ControllerBase
         return result.IsSuccess ? NoContent() : NotFound(new { result.Error, result.ErrorCode });
     }
 
+    [HttpGet("{id:guid}/thumbnail-url")]
+    public async Task<IActionResult> GetThumbnailUrl(Guid id, CancellationToken ct)
+    {
+        var result = await _fragmentService.GetThumbnailUrlAsync(id, ct);
+        return result.IsSuccess ? Ok(new { url = result.Value }) : NotFound(new { result.Error, result.ErrorCode });
+    }
+
 }

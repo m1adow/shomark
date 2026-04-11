@@ -52,6 +52,13 @@ public class CampaignService : ICampaignService
     {
         var userId = _currentUser.UserId;
 
+        if (!string.IsNullOrWhiteSpace(request.Name))
+        {
+            var existing = await _campaignRepository.GetByUserAndNameAsync(userId, request.Name, ct);
+            if (existing is not null)
+                return Result<CampaignDto>.Failure("A campaign with this name already exists", "DUPLICATE");
+        }
+
         if (request.FragmentId.HasValue)
         {
             var fragment = await _fragmentRepository.GetByIdAsync(request.FragmentId.Value, ct);
@@ -86,7 +93,16 @@ public class CampaignService : ICampaignService
         if (campaign is null)
             return Result<CampaignDto>.Failure("Campaign not found", "NOT_FOUND");
 
-        if (request.Name is not null) campaign.Name = request.Name;
+        if (request.Name is not null)
+        {
+            if (request.Name != campaign.Name)
+            {
+                var existing = await _campaignRepository.GetByUserAndNameAsync(campaign.UserId, request.Name, ct);
+                if (existing is not null)
+                    return Result<CampaignDto>.Failure("A campaign with this name already exists", "DUPLICATE");
+            }
+            campaign.Name = request.Name;
+        }
         if (request.Status.HasValue) campaign.Status = request.Status.Value;
         if (request.TargetAudience.HasValue) campaign.TargetAudience = request.TargetAudience.Value;
         if (request.Description is not null) campaign.Description = request.Description;
