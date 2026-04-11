@@ -48,3 +48,11 @@ export function useDeleteFragment() {
     useCallback((id: string) => fragmentsApi.delete(id), []),
   );
 }
+
+export function useFragmentThumbnailUrl(id: string, enabled = true) {
+  return useApiQuery(
+    (signal) => fragmentsApi.getThumbnailUrl(id, signal),
+    [id],
+    { enabled },
+  );
+}

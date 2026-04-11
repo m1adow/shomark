@@ -32,6 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
         services.AddScoped<IPlatformRepository, PlatformRepository>();
         services.AddScoped<ICampaignRepository, CampaignRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
 
         // HttpContext accessor (required by CurrentUserAccessor)
         services.AddHttpContextAccessor();
@@ -40,6 +41,7 @@ public static class ServiceCollectionExtensions
         services.Configure<KafkaOptions>(configuration.GetSection(KafkaOptions.SectionName));
         services.AddSingleton<IVideoProcessingProducer, KafkaVideoProcessingProducer>();
         services.AddSingleton<IVideoProcessingNotifier, VideoProcessingNotifier>();
+        services.AddSingleton<INotificationSseNotifier, NotificationSseNotifier>();
         services.AddHostedService<KafkaCompletionConsumer>();
 
         // MinIO Storage
@@ -69,8 +71,14 @@ public static class ServiceCollectionExtensions
                 {
                     OnMessageReceived = context =>
                     {
-                        if (context.Request.Path.StartsWithSegments("/api/videos")
-                            && context.Request.Path.Value?.EndsWith("/events") == true
+                        var path = context.Request.Path;
+
+                        var isSseEndpoint =
+                            (path.StartsWithSegments("/api/videos")
+                             && path.Value?.EndsWith("/events") == true)
+                            || path.StartsWithSegments("/api/notifications/stream");
+
+                        if (isSseEndpoint
                             && context.Request.Query.TryGetValue("access_token", out var token))
                         {
                             context.Token = token;
@@ -93,6 +101,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAnalyticsService, AnalyticsService>();
         services.AddScoped<IPlatformService, PlatformService>();
         services.AddScoped<ICampaignService, CampaignService>();
+        services.AddScoped<INotificationService, NotificationService>();
 
         return services;
     }

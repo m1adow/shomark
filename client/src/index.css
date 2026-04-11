@@ -11,3 +11,115 @@ html, body, #root {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
+
+/* Fix PrimeReact Steps number circle — Tailwind v4 preflight resets background */
+.p-steps .p-steps-item .p-menuitem-link .p-steps-number {
+  background-color: #f8f9fa !important;
+  color: #6c757d !important;
+  border: 2px solid #dee2e6 !important;
+}
+
+.p-steps .p-steps-item.p-highlight .p-menuitem-link .p-steps-number {
+  background-color: var(--primary-color, #3B82F6) !important;
+  color: #ffffff !important;
+  border-color: var(--primary-color, #3B82F6) !important;
+}
+
+/* Rounded DataTable */
+.p-datatable {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.p-datatable .p-datatable-thead > tr > th:first-child {
+  border-top-left-radius: 0.75rem;
+}
+
+.p-datatable .p-datatable-thead > tr > th:last-child {
+  border-top-right-radius: 0.75rem;
+}
+
+.p-datatable .p-datatable-tbody > tr:last-child > td:first-child {
+  border-bottom-left-radius: 0.75rem;
+}
+
+.p-datatable .p-datatable-tbody > tr:last-child > td:last-child {
+  border-bottom-right-radius: 0.75rem;
+}
+
+/* When paginator is present, round the paginator bottom instead */
+.p-datatable.p-datatable-has-footer .p-datatable-tbody > tr:last-child > td {
+  border-radius: 0;
+}
+
+.p-datatable .p-paginator-bottom {
+  border-bottom-left-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Schedule calendar: stretch inline calendar to fill container */
+.schedule-calendar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.schedule-calendar .p-datepicker {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.schedule-calendar .p-datepicker .p-datepicker-group-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.schedule-calendar .p-datepicker .p-datepicker-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.schedule-calendar .p-datepicker .p-datepicker-calendar-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.schedule-calendar .p-datepicker table {
+  width: 100%;
+  flex: 1;
+}
+.schedule-calendar .p-datepicker td {
+  padding: 0.75rem;
+}
+.schedule-calendar .p-datepicker td > span {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+/* Make Card stretch its content for schedule calendar */
+.schedule-card {
+  display: flex;
+  flex-direction: column;
+}
+.schedule-card .p-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.schedule-card .p-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Disable date selection clicks on schedule calendar */
+.pointer-events-none-dates .p-datepicker td > span {
+  pointer-events: none;
+  cursor: default;
+}
+.pointer-events-none-dates .p-datepicker td > span.p-highlight {
+  background: transparent;
+  color: inherit;
+}

@@ -11,4 +11,5 @@ public interface IAiFragmentService
     Task<Result<AiFragmentDto>> CreateAsync(CreateAiFragmentRequest request, CancellationToken ct = default);
     Task<Result<AiFragmentDto>> UpdateAsync(Guid id, UpdateAiFragmentRequest request, CancellationToken ct = default);
     Task<Result<bool>> DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<Result<string>> GetThumbnailUrlAsync(Guid id, CancellationToken ct = default);
 }

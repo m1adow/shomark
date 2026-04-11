@@ -13,6 +13,7 @@ public class ShoMarkDbContext : DbContext
     public DbSet<Analytics> Analytics => Set<Analytics>();
     public DbSet<Platform> Platforms => Set<Platform>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

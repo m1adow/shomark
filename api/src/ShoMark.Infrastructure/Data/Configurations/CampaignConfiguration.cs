@@ -37,5 +37,6 @@ public class CampaignConfiguration : IEntityTypeConfiguration<Campaign>
         builder.HasIndex(c => c.UserId);
         builder.HasIndex(c => c.FragmentId);
         builder.HasIndex(c => c.VideoId);
+        builder.HasIndex(c => new { c.UserId, c.Name }).IsUnique();
     }
 }
