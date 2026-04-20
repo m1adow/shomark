@@ -5,6 +5,7 @@ import { Checkbox } from 'primereact/checkbox';
 import { Card } from 'primereact/card';
 import { Tag } from 'primereact/tag';
 import { Message } from 'primereact/message';
+import { SocialIcon } from 'react-social-icons';
 import type { AiFragmentDto, PlatformDto, PostDto } from '../../api/types';
 import { useFragmentThumbnailUrl } from '../../hooks/useFragments';
 
@@ -51,7 +52,6 @@ export default function StepSchedulePublish({
   const [selectedPlatformIds, setSelectedPlatformIds] = useState<string[]>([]);
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
   const [scheduledTime, setScheduledTime] = useState<Date | null>(null);
-  const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   const combinedDateTime = useMemo(() => {
     if (!scheduledDate) return null;
@@ -65,18 +65,29 @@ export default function StepSchedulePublish({
   const canSchedule = selectedPlatformIds.length > 0 && combinedDateTime !== null && !publishing;
   const canPublish = selectedPlatformIds.length > 0 && !publishing;
 
-  // Build a map: dateString -> Set of platformIds that have posts
+  // Build a map: dateString -> { platformIds, isPreDraft }
   const scheduledDatePlatformMap = useMemo(() => {
-    const map = new Map<string, Set<string>>();
+    const map = new Map<string, { platformIds: Set<string>; isPreDraft: boolean }>();
     scheduledPosts.forEach((p) => {
       if (p.scheduledAt) {
         const key = new Date(p.scheduledAt).toDateString();
-        if (!map.has(key)) map.set(key, new Set());
-        map.get(key)!.add(p.platformId);
+        if (!map.has(key)) map.set(key, { platformIds: new Set(), isPreDraft: false });
+        map.get(key)!.platformIds.add(p.platformId);
       }
     });
+    // Add pre-draft entry for the user-selected date + platforms (UI-only)
+    if (scheduledDate && selectedPlatformIds.length > 0) {
+      const key = scheduledDate.toDateString();
+      if (!map.has(key)) map.set(key, { platformIds: new Set(), isPreDraft: true });
+      const entry = map.get(key)!;
+      selectedPlatformIds.forEach((id) => entry.platformIds.add(id));
+      // Mark as pre-draft only if all entries came from local selection
+      if (entry.platformIds.size === selectedPlatformIds.length) {
+        entry.isPreDraft = true;
+      }
+    }
     return map;
-  }, [scheduledPosts]);
+  }, [scheduledPosts, scheduledDate, selectedPlatformIds]);
 
   const fragment = approvedFragments[0] ?? null;
 
@@ -146,7 +157,10 @@ export default function StepSchedulePublish({
                         checked={selectedPlatformIds.includes(p.id)}
                         onChange={() => togglePlatform(p.id)}
                       />
-                      <i className={platformIcon(p.platformType)} />
+                      <SocialIcon
+                        network={platformNetwork(p.platformType)}
+                        style={{ width: 24, height: 24 }}
+                      />
                       <span className="text-sm font-medium text-gray-900">
                         {p.platformType}
                       </span>
@@ -218,16 +232,16 @@ export default function StepSchedulePublish({
           <Card className="shadow-sm flex-1 schedule-card">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Scheduled Posts</h3>
             <Calendar
-              value={calendarMonth}
-              onChange={(e) => setCalendarMonth(e.value as Date)}
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.value as Date | null)}
               inline
               selectionMode="single"
-              readOnlyInput
-              className="w-full schedule-calendar pointer-events-none-dates"
+              minDate={new Date()}
+              className="w-full schedule-calendar"
               dateTemplate={(date) => {
                 const d = new Date(date.year, date.month, date.day);
-                const platformIds = scheduledDatePlatformMap.get(d.toDateString());
-                const hasPost = !!platformIds && platformIds.size > 0;
+                const entry = scheduledDatePlatformMap.get(d.toDateString());
+                const hasPost = !!entry && entry.platformIds.size > 0;
                 return (
                   <div className="flex flex-col items-center">
                     <span className={hasPost ? 'font-bold text-blue-600' : ''}>
@@ -235,12 +249,12 @@ export default function StepSchedulePublish({
                     </span>
                     {hasPost && (
                       <div className="flex gap-0.5 mt-0.5">
-                        {Array.from(platformIds).slice(0, 4).map((pid) => {
+                        {Array.from(entry.platformIds).slice(0, 4).map((pid) => {
                           const platform = platforms.find((pl) => pl.id === pid);
                           return (
                             <span
                               key={pid}
-                              className={`block w-1.5 h-1.5 rounded-full ${platformDotColor(platform?.platformType)}`}
+                              className={`block w-1.5 h-1.5 rounded-full ${platformDotColor(platform?.platformType)} ${entry.isPreDraft ? 'pre-draft-dot' : ''}`}
                               title={platform?.platformType ?? 'Unknown'}
                             />
                           );
@@ -274,7 +288,10 @@ export default function StepSchedulePublish({
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           {platform && (
-                            <i className={platformIcon(platform.platformType)} />
+                            <SocialIcon
+                              network={platformNetwork(platform.platformType)}
+                              style={{ width: 20, height: 20 }}
+                            />
                           )}
                           <span className="text-sm text-gray-700 truncate">
                             {p.title ?? 'Untitled'}
@@ -298,15 +315,15 @@ export default function StepSchedulePublish({
   );
 }
 
-function platformIcon(type: string) {
+function platformNetwork(type: string): string {
   switch (type) {
-    case 'Instagram': return 'pi pi-instagram text-pink-500';
-    case 'TikTok': return 'pi pi-tiktok text-gray-900';
-    case 'YouTube': return 'pi pi-youtube text-red-600';
-    case 'X': return 'pi pi-twitter text-gray-800';
-    case 'LinkedIn': return 'pi pi-linkedin text-blue-700';
-    case 'Telegram': return 'pi pi-telegram text-blue-500';
-    default: return 'pi pi-globe text-gray-500';
+    case 'Instagram': return 'instagram';
+    case 'TikTok': return 'tiktok';
+    case 'YouTube': return 'youtube';
+    case 'X': return 'x';
+    case 'LinkedIn': return 'linkedin';
+    case 'Telegram': return 'telegram';
+    default: return 'sharethis';
   }
 }
 

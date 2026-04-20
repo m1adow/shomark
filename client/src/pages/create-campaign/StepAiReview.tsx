@@ -3,7 +3,6 @@ import { Button } from 'primereact/button';
 import { Card } from 'primereact/card';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
-import { ProgressSpinner } from 'primereact/progressspinner';
 import { Message } from 'primereact/message';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { AiFragmentDto } from '../../api/types';
@@ -11,19 +10,88 @@ import { useFragmentThumbnailUrl } from '../../hooks/useFragments';
 
 function FragmentThumbnail({ fragmentId, index }: { fragmentId: string; index: number }) {
   const { data } = useFragmentThumbnailUrl(fragmentId);
-  if (data?.url) {
-    return (
-      <img
-        src={data.url}
-        alt={`Clip ${index + 1}`}
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
-    );
-  }
+  const [imgLoaded, setImgLoaded] = useState(false);
+
   return (
-    <div className="flex items-center justify-center w-full h-full bg-gray-100">
-      <span className="text-xs text-gray-400">Clip {index + 1}</span>
+    <div className="relative w-full h-full">
+      {/* Shimmer skeleton shown until image loads */}
+      {(!data?.url || !imgLoaded) && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 animate-pulse">
+          <svg viewBox="0 0 24 24" className="w-10 h-10 text-gray-300" fill="currentColor">
+            <path d="M21 3H3C2 3 1 4 1 5v14c0 1.1.9 2 2 2h18c1 0 2-1 2-2V5c0-1-1-2-2-2zm0 16H3V5h18v14zm-9-2l-4-5-3 4h14l-5-6-2 3z" />
+          </svg>
+        </div>
+      )}
+      {data?.url && (
+        <motion.img
+          src={data.url}
+          alt={`Clip ${index + 1}`}
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+          onLoad={() => setImgLoaded(true)}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: imgLoaded ? 1 : 0 }}
+          transition={{ duration: 0.4 }}
+        />
+      )}
+    </div>
+  );
+}
+
+function VideoPlayer({ url }: { url: string | null }) {
+  const [videoReady, setVideoReady] = useState(false);
+
+  const showPlaceholder = !url || !videoReady;
+
+  return (
+    <div className="relative w-full aspect-video rounded-xl overflow-hidden">
+      {/* Placeholder — shown while loading or when URL is unavailable */}
+      <AnimatePresence>
+        {showPlaceholder && (
+          <motion.div
+            key="video-placeholder"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-3"
+            style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e40af 100%)' }}
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            {url ? (
+              /* URL exists but video hasn't loaded yet */
+              <>
+                <motion.div
+                  className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center"
+                  animate={{ scale: [1, 1.1, 1], opacity: [0.6, 1, 0.6] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  <i className="pi pi-play text-white text-xl ml-1" />
+                </motion.div>
+                <p className="text-white/60 text-sm">Loading video…</p>
+              </>
+            ) : (
+              /* No URL at all */
+              <>
+                <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
+                  <i className="pi pi-video text-white/40 text-2xl" />
+                </div>
+                <p className="text-white/40 text-sm">Video preview unavailable</p>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {url && (
+        <motion.video
+          src={url}
+          controls
+          className="absolute inset-0 w-full h-full object-contain bg-black"
+          onLoadedData={() => setVideoReady(true)}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: videoReady ? 1 : 0 }}
+          transition={{ duration: 0.5 }}
+        />
+      )}
     </div>
   );
 }
@@ -184,21 +252,82 @@ export default function StepAiReview({
 
   if (loading || (fragments.length === 0 && !error && !regenerating)) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="flex flex-col items-center justify-center py-16 gap-4"
-      >
-        <ProgressSpinner style={{ width: '48px', height: '48px' }} />
-        <motion.p
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="text-gray-600"
-        >
-          AI is analyzing your video…
-        </motion.p>
-        <p className="text-xs text-gray-400">This may take a few minutes</p>
-      </motion.div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left: Original video while AI processes */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Original Video</h3>
+          <VideoPlayer url={videoUrl} />
+        </div>
+
+        {/* Right: Generation animation */}
+        <div className="flex flex-col relative">
+          <h3 className="text-lg font-medium text-gray-900 mb-3">AI Clips</h3>
+
+          {/* Skeletons behind (z-0) */}
+          <div className="flex-1 space-y-4 relative z-0">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: [0.3, 0.6, 0.3] }}
+                transition={{
+                  opacity: { duration: 1.5, repeat: Infinity, delay: i * 0.3 },
+                  y: { duration: 0.4, delay: i * 0.15 },
+                }}
+              >
+                <Card className="shadow-sm">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 w-40 h-28 rounded bg-gray-200 animate-pulse" />
+                    <div className="flex-1 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
+                        <div className="h-4 w-10 bg-gray-200 rounded animate-pulse" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-3 w-full bg-gray-200 rounded animate-pulse" />
+                        <div className="h-3 w-3/4 bg-gray-200 rounded animate-pulse" />
+                      </div>
+                      <div className="flex gap-1.5">
+                        <div className="h-5 w-14 bg-blue-100 rounded-full animate-pulse" />
+                        <div className="h-5 w-18 bg-blue-100 rounded-full animate-pulse" />
+                        <div className="h-5 w-12 bg-blue-100 rounded-full animate-pulse" />
+                      </div>
+                      <div className="h-8 w-full bg-gray-200 rounded animate-pulse" />
+                    </div>
+                  </div>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Loader overlay (z-10) */}
+          <motion.div
+            className="absolute inset-0 top-10 z-10 flex flex-col items-center justify-center"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="flex flex-col items-center gap-3 bg-white/80 backdrop-blur-sm rounded-2xl px-8 py-6 shadow-lg">
+              <motion.i
+                className="pi pi-star-fill text-3xl text-purple-600"
+                animate={{ rotate: 360, scale: [1, 1.15, 1] }}
+                transition={{
+                  rotate: { duration: 3, repeat: Infinity, ease: 'linear' },
+                  scale: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' },
+                }}
+              />
+              <motion.p
+                animate={{ opacity: [0.6, 1, 0.6] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="text-gray-700 text-sm font-medium"
+              >
+                AI is analyzing your video…
+              </motion.p>
+              <p className="text-xs text-gray-400">This may take a few minutes</p>
+            </div>
+          </motion.div>
+        </div>
+      </div>
     );
   }
 
@@ -216,17 +345,7 @@ export default function StepAiReview({
       {/* Left: Video Preview */}
       <div>
         <h3 className="text-lg font-medium text-gray-900 mb-3">Original Video</h3>
-        {videoUrl ? (
-          <video
-            src={videoUrl}
-            controls
-            className="w-full rounded-lg bg-black aspect-video"
-          />
-        ) : (
-          <div className="flex items-center justify-center bg-gray-100 rounded-lg aspect-video">
-            <span className="text-gray-400">Video preview unavailable</span>
-          </div>
-        )}
+        <VideoPlayer url={videoUrl} />
       </div>
 
       {/* Right: Fragment Clip Cards */}

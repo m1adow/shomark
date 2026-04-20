@@ -17,6 +17,8 @@ builder.Services.AddScoped<ICurrentUserAccessor, HttpContextCurrentUserAccessor>
 
 builder.Services.AddOpenApi();
 
+builder.Services.AddMemoryCache();
+
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>() ?? [];

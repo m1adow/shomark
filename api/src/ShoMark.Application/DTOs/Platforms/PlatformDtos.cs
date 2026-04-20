@@ -23,3 +23,10 @@ public record UpdatePlatformRequest(
     string? AccessToken,
     string? RefreshToken,
     DateTime? TokenExpiresAt);
+
+public record DecryptedPlatformTokens(
+    Guid PlatformId,
+    PlatformType PlatformType,
+    string? AccessToken,
+    string? RefreshToken,
+    DateTime? TokenExpiresAt);

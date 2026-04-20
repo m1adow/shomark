@@ -67,3 +67,9 @@ export function useScheduledPostsInRange(from: string, to: string, enabled = tru
     { enabled },
   );
 }
+
+export function usePublishPost() {
+  return useApiMutation(
+    useCallback((id: string) => postsApi.publish(id), []),
+  );
+}

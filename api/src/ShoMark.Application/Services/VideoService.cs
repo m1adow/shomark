@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using ShoMark.Application.Common;
 using ShoMark.Application.DTOs.Videos;
 using ShoMark.Application.Interfaces;
+using ShoMark.Application.Mappings;
 using ShoMark.Domain.Entities;
 using ShoMark.Domain.Interfaces;
 
@@ -30,23 +31,23 @@ public class VideoService : IVideoService
     {
         var video = await _videoRepository.GetByIdAsync(id, ct);
         if (video is null)
-            return Result<VideoDto>.Failure("Video not found", "NOT_FOUND");
+            return Result<VideoDto>.Failure(Constants.Errors.Messages.VideoNotFound, Constants.Errors.Codes.NotFound);
 
-        return Result<VideoDto>.Success(MapToDto(video));
+        return Result<VideoDto>.Success(video.ToDto());
     }
 
     public async Task<Result<IReadOnlyList<VideoDto>>> GetAllAsync(CancellationToken ct = default)
     {
         var videos = await _videoRepository.GetActiveVideosAsync(ct);
         return Result<IReadOnlyList<VideoDto>>.Success(
-            videos.Select(MapToDto).ToList());
+            videos.Select(v => v.ToDto()).ToList());
     }
 
     public async Task<Result<VideoWithFragmentsDto>> GetWithFragmentsAsync(Guid id, CancellationToken ct = default)
     {
         var video = await _videoRepository.GetWithFragmentsAsync(id, ct);
         if (video is null)
-            return Result<VideoWithFragmentsDto>.Failure("Video not found", "NOT_FOUND");
+            return Result<VideoWithFragmentsDto>.Failure(Constants.Errors.Messages.VideoNotFound, Constants.Errors.Codes.NotFound);
 
         var dto = new VideoWithFragmentsDto(
             video.Id, video.Title, video.MinioKey, video.OriginalFileName,
@@ -62,7 +63,7 @@ public class VideoService : IVideoService
     {
         var existing = await _videoRepository.GetByMinioKeyAsync(request.MinioKey, ct);
         if (existing is not null)
-            return Result<VideoDto>.Failure("A video with this MinIO key already exists", "DUPLICATE");
+            return Result<VideoDto>.Failure(Constants.Errors.Messages.DuplicateVideo, Constants.Errors.Codes.Duplicate);
 
         var video = new Video
         {
@@ -74,14 +75,14 @@ public class VideoService : IVideoService
         };
 
         var created = await _videoRepository.AddAsync(video, ct);
-        return Result<VideoDto>.Success(MapToDto(created));
+        return Result<VideoDto>.Success(created.ToDto());
     }
 
     public async Task<Result<VideoDto>> UpdateAsync(Guid id, UpdateVideoRequest request, CancellationToken ct = default)
     {
         var video = await _videoRepository.GetByIdAsync(id, ct);
         if (video is null)
-            return Result<VideoDto>.Failure("Video not found", "NOT_FOUND");
+            return Result<VideoDto>.Failure(Constants.Errors.Messages.VideoNotFound, Constants.Errors.Codes.NotFound);
 
         video.Title = request.Title;
         video.OriginalFileName = request.OriginalFileName;
@@ -89,14 +90,14 @@ public class VideoService : IVideoService
         video.FileSize = request.FileSize;
 
         await _videoRepository.UpdateAsync(video, ct);
-        return Result<VideoDto>.Success(MapToDto(video));
+        return Result<VideoDto>.Success(video.ToDto());
     }
 
     public async Task<Result<bool>> DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var video = await _videoRepository.GetByIdAsync(id, ct);
         if (video is null)
-            return Result<bool>.Failure("Video not found", "NOT_FOUND");
+            return Result<bool>.Failure(Constants.Errors.Messages.VideoNotFound, Constants.Errors.Codes.NotFound);
 
         // Soft delete
         video.DeletedAt = DateTime.UtcNow;
@@ -108,14 +109,14 @@ public class VideoService : IVideoService
     {
         var video = await _videoRepository.GetByIdAsync(id, ct);
         if (video is null)
-            return Result<bool>.Failure("Video not found", "NOT_FOUND");
+            return Result<bool>.Failure(Constants.Errors.Messages.VideoNotFound, Constants.Errors.Codes.NotFound);
 
         // Parse bucket and key from the MinIO key (format: "bucket/key" or just "key")
         var parts = video.MinioKey.Split('/', 2);
-        var videoBucket = parts.Length > 1 ? parts[0] : "videos";
+        var videoBucket = parts.Length > 1 ? parts[0] : Constants.Storage.VideosBucket;
         var videoKey = parts.Length > 1 ? parts[1] : video.MinioKey;
 
-        var outputBucket = request.OutputBucket ?? "highlights";
+        var outputBucket = request.OutputBucket ?? Constants.Storage.HighlightsBucket;
         var outputPrefix = request.OutputPrefix ?? $"{video.Id}/";
 
         await _processingProducer.SendProcessingRequestAsync(
@@ -124,11 +125,6 @@ public class VideoService : IVideoService
 
         return Result<bool>.Success(true);
     }
-
-    //TODO: make all map methods with static extension methods in a separate class
-    private static VideoDto MapToDto(Video v) => new(
-        v.Id, v.Title, v.MinioKey, v.OriginalFileName,
-        v.DurationSeconds, v.FileSize, v.CreatedAt, v.UpdatedAt);
 
     public async Task<Result<VideoDto>> UploadAsync(Stream fileStream, string fileName, long fileSize, string contentType, CancellationToken ct = default)
     {
@@ -149,14 +145,14 @@ public class VideoService : IVideoService
         };
 
         var created = await _videoRepository.AddAsync(video, ct);
-        return Result<VideoDto>.Success(MapToDto(created));
+        return Result<VideoDto>.Success(created.ToDto());
     }
 
     public async Task<Result<string>> GetVideoUrlAsync(Guid id, CancellationToken ct = default)
     {
         var video = await _videoRepository.GetByIdAsync(id, ct);
         if (video is null)
-            return Result<string>.Failure("Video not found", "NOT_FOUND");
+            return Result<string>.Failure(Constants.Errors.Messages.VideoNotFound, Constants.Errors.Codes.NotFound);
 
         var parts = video.MinioKey.Split('/', 2);
         var bucket = parts.Length > 1 ? parts[0] : _minioOptions.VideoBucket;

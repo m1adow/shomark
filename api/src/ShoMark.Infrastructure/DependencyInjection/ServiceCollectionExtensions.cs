@@ -1,14 +1,19 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ShoMark.Application.Common;
 using ShoMark.Application.Interfaces;
 using ShoMark.Application.Services;
+using ShoMark.Domain.Enums;
 using ShoMark.Domain.Interfaces;
 using ShoMark.Infrastructure.Data;
 using ShoMark.Infrastructure.Messaging;
+using ShoMark.Infrastructure.OAuth;
+using ShoMark.Infrastructure.Publishing;
 using ShoMark.Infrastructure.Repositories;
+using ShoMark.Infrastructure.Security;
 using ShoMark.Infrastructure.Storage;
 
 namespace ShoMark.Infrastructure.DependencyInjection;
@@ -37,6 +42,47 @@ public static class ServiceCollectionExtensions
         // HttpContext accessor (required by CurrentUserAccessor)
         services.AddHttpContextAccessor();
 
+        // Data Protection (token encryption)
+        services.AddDataProtection()
+            .SetApplicationName("ShoMark")
+            .PersistKeysToFileSystem(new DirectoryInfo(
+                Path.Combine(AppContext.BaseDirectory, "DataProtection-Keys")));
+        services.AddSingleton<ITokenEncryptionService, DataProtectionTokenEncryptionService>();
+
+        // Memory cache (for OAuth state)
+        services.AddMemoryCache();
+
+        // OAuth providers
+        services.Configure<OAuthOptions>(configuration.GetSection(OAuthOptions.SectionName));
+        services.AddHttpClient<InstagramOAuthProvider>();
+        services.AddHttpClient<TikTokOAuthProvider>();
+        services.AddHttpClient<YouTubeOAuthProvider>();
+        services.AddHttpClient<XOAuthProvider>();
+
+        services.AddSingleton<IOAuthProvider>(sp =>
+            sp.GetRequiredService<InstagramOAuthProvider>());
+        services.AddSingleton<IOAuthProvider>(sp =>
+            sp.GetRequiredService<TikTokOAuthProvider>());
+        services.AddSingleton<IOAuthProvider>(sp =>
+            sp.GetRequiredService<YouTubeOAuthProvider>());
+        services.AddSingleton<IOAuthProvider>(sp =>
+            sp.GetRequiredService<XOAuthProvider>());
+
+        // Social media publishers
+        services.AddHttpClient<InstagramPublisher>();
+        services.AddHttpClient<TikTokPublisher>();
+        services.AddHttpClient<YouTubePublisher>();
+        services.AddHttpClient<XPublisher>();
+
+        services.AddSingleton<ISocialMediaPublisher>(sp =>
+            sp.GetRequiredService<InstagramPublisher>());
+        services.AddSingleton<ISocialMediaPublisher>(sp =>
+            sp.GetRequiredService<TikTokPublisher>());
+        services.AddSingleton<ISocialMediaPublisher>(sp =>
+            sp.GetRequiredService<YouTubePublisher>());
+        services.AddSingleton<ISocialMediaPublisher>(sp =>
+            sp.GetRequiredService<XPublisher>());
+
         // Kafka
         services.Configure<KafkaOptions>(configuration.GetSection(KafkaOptions.SectionName));
         services.AddSingleton<IVideoProcessingProducer, KafkaVideoProcessingProducer>();
@@ -44,8 +90,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<INotificationSseNotifier, NotificationSseNotifier>();
         services.AddHostedService<KafkaCompletionConsumer>();
 
+        // Post publishing pipeline
+        services.AddSingleton<IPostPublishingProducer, KafkaPostPublishingProducer>();
+        services.AddHostedService<PostSchedulerBackgroundService>();
+        services.AddHostedService<KafkaPostPublishingConsumer>();
+
         // MinIO Storage
         services.Configure<MinioOptions>(configuration.GetSection(MinioOptions.SectionName));
+        services.Configure<VideoOptions>(configuration.GetSection(VideoOptions.SectionName));
         services.AddSingleton<IStorageService, MinioStorageService>();
 
         // Authentication (Keycloak)
@@ -102,6 +154,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPlatformService, PlatformService>();
         services.AddScoped<ICampaignService, CampaignService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IOAuthService, OAuthService>();
+        services.AddScoped<IPostPublishingService, PostPublishingService>();
 
         return services;
     }

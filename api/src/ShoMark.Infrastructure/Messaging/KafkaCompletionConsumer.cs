@@ -191,7 +191,7 @@ public class KafkaCompletionConsumer : BackgroundService
                     Domain.Enums.NotificationType.VideoProcessingCompleted,
                     $"Video \"{video.Title}\" processed",
                     $"{highlightsElement.GetArrayLength()} highlights generated",
-                    video.Id,
+                    campaign.Id,
                     ct);
             }
         }

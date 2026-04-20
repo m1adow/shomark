@@ -6,6 +6,7 @@ import CampaignDetailsPage from '../pages/CampaignDetailsPage';
 import CreateCampaignPage from '../pages/create-campaign/CreateCampaignPage';
 import AnalyticsPage from '../pages/AnalyticsPage';
 import SettingsPage from '../pages/SettingsPage';
+import OAuthCallbackPage from '../pages/OAuthCallbackPage';
 
 export const router = createBrowserRouter([
   {
@@ -61,6 +62,14 @@ export const router = createBrowserRouter([
     element: (
       <AppLayout>
         <SettingsPage />
+      </AppLayout>
+    ),
+  },
+  {
+    path: '/oauth/callback',
+    element: (
+      <AppLayout>
+        <OAuthCallbackPage />
       </AppLayout>
     ),
   },

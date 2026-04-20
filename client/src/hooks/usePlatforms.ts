@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { platformsApi } from '../api';
-import type { CreatePlatformRequest, UpdatePlatformRequest } from '../api';
+import type { CreatePlatformRequest, UpdatePlatformRequest, OAuthPlatform } from '../api';
 import { useApiQuery, useApiMutation } from './useApi';
 
 export function usePlatform(id: string) {
@@ -35,5 +35,23 @@ export function useUpdatePlatform() {
 export function useDeletePlatform() {
   return useApiMutation(
     useCallback((id: string) => platformsApi.delete(id), []),
+  );
+}
+
+export function useConnectPlatform() {
+  return useApiMutation(
+    useCallback((platform: OAuthPlatform) => platformsApi.getConnectUrl(platform), []),
+  );
+}
+
+export function useDisconnectPlatform() {
+  return useApiMutation(
+    useCallback((platform: OAuthPlatform) => platformsApi.disconnect(platform), []),
+  );
+}
+
+export function useRefreshPlatformToken() {
+  return useApiMutation(
+    useCallback((platform: OAuthPlatform) => platformsApi.refreshToken(platform), []),
   );
 }

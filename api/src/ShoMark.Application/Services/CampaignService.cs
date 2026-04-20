@@ -1,6 +1,7 @@
 using ShoMark.Application.Common;
 using ShoMark.Application.DTOs.Campaigns;
 using ShoMark.Application.Interfaces;
+using ShoMark.Application.Mappings;
 using ShoMark.Domain.Entities;
 using ShoMark.Domain.Interfaces;
 
@@ -29,23 +30,23 @@ public class CampaignService : ICampaignService
     {
         var campaign = await _campaignRepository.GetByIdAsync(id, ct);
         if (campaign is null)
-            return Result<CampaignDto>.Failure("Campaign not found", "NOT_FOUND");
+            return Result<CampaignDto>.Failure(Constants.Errors.Messages.CampaignNotFound, Constants.Errors.Codes.NotFound);
 
-        return Result<CampaignDto>.Success(MapToDto(campaign));
+        return Result<CampaignDto>.Success(campaign.ToDto());
     }
 
     public async Task<Result<IReadOnlyList<CampaignDto>>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
     {
         var campaigns = await _campaignRepository.GetByUserIdAsync(userId, ct);
         return Result<IReadOnlyList<CampaignDto>>.Success(
-            campaigns.Select(MapToDto).ToList());
+            campaigns.Select(c => c.ToDto()).ToList());
     }
 
     public async Task<Result<IReadOnlyList<CampaignDto>>> GetByVideoIdAsync(Guid videoId, CancellationToken ct = default)
     {
         var campaigns = await _campaignRepository.GetByVideoIdAsync(videoId, ct);
         return Result<IReadOnlyList<CampaignDto>>.Success(
-            campaigns.Select(MapToDto).ToList());
+            campaigns.Select(c => c.ToDto()).ToList());
     }
 
     public async Task<Result<CampaignDto>> CreateAsync(CreateCampaignRequest request, CancellationToken ct = default)
@@ -56,21 +57,21 @@ public class CampaignService : ICampaignService
         {
             var existing = await _campaignRepository.GetByUserAndNameAsync(userId, request.Name, ct);
             if (existing is not null)
-                return Result<CampaignDto>.Failure("A campaign with this name already exists", "DUPLICATE");
+                return Result<CampaignDto>.Failure(Constants.Errors.Messages.DuplicateCampaign, Constants.Errors.Codes.Duplicate);
         }
 
         if (request.FragmentId.HasValue)
         {
             var fragment = await _fragmentRepository.GetByIdAsync(request.FragmentId.Value, ct);
             if (fragment is null)
-                return Result<CampaignDto>.Failure("Fragment not found", "NOT_FOUND");
+                return Result<CampaignDto>.Failure(Constants.Errors.Messages.FragmentNotFound, Constants.Errors.Codes.NotFound);
         }
 
         if (request.VideoId.HasValue)
         {
             var video = await _videoRepository.GetByIdAsync(request.VideoId.Value, ct);
             if (video is null)
-                return Result<CampaignDto>.Failure("Video not found", "NOT_FOUND");
+                return Result<CampaignDto>.Failure(Constants.Errors.Messages.VideoNotFound, Constants.Errors.Codes.NotFound);
         }
 
         var campaign = new Campaign
@@ -84,14 +85,14 @@ public class CampaignService : ICampaignService
         };
 
         var created = await _campaignRepository.AddAsync(campaign, ct);
-        return Result<CampaignDto>.Success(MapToDto(created));
+        return Result<CampaignDto>.Success(created.ToDto());
     }
 
     public async Task<Result<CampaignDto>> UpdateAsync(Guid id, UpdateCampaignRequest request, CancellationToken ct = default)
     {
         var campaign = await _campaignRepository.GetByIdAsync(id, ct);
         if (campaign is null)
-            return Result<CampaignDto>.Failure("Campaign not found", "NOT_FOUND");
+            return Result<CampaignDto>.Failure(Constants.Errors.Messages.CampaignNotFound, Constants.Errors.Codes.NotFound);
 
         if (request.Name is not null)
         {
@@ -99,7 +100,7 @@ public class CampaignService : ICampaignService
             {
                 var existing = await _campaignRepository.GetByUserAndNameAsync(campaign.UserId, request.Name, ct);
                 if (existing is not null)
-                    return Result<CampaignDto>.Failure("A campaign with this name already exists", "DUPLICATE");
+                    return Result<CampaignDto>.Failure(Constants.Errors.Messages.DuplicateCampaign, Constants.Errors.Codes.Duplicate);
             }
             campaign.Name = request.Name;
         }
@@ -110,21 +111,24 @@ public class CampaignService : ICampaignService
         if (request.FragmentId.HasValue) campaign.FragmentId = request.FragmentId.Value;
 
         await _campaignRepository.UpdateAsync(campaign, ct);
-        return Result<CampaignDto>.Success(MapToDto(campaign));
+        return Result<CampaignDto>.Success(campaign.ToDto());
     }
 
     public async Task<Result<bool>> DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var campaign = await _campaignRepository.GetByIdAsync(id, ct);
         if (campaign is null)
-            return Result<bool>.Failure("Campaign not found", "NOT_FOUND");
+            return Result<bool>.Failure(Constants.Errors.Messages.CampaignNotFound, Constants.Errors.Codes.NotFound);
 
         await _campaignRepository.DeleteAsync(id, ct);
         return Result<bool>.Success(true);
     }
 
-    private static CampaignDto MapToDto(Campaign c) => new(
-        c.Id, c.UserId, c.FragmentId, c.VideoId, c.Name,
-        c.TargetAudience?.ToString(), c.Description,
-        c.Status.ToString(), c.CreatedAt, c.UpdatedAt);
+    public async Task<Result<bool>> IsNameAvailableAsync(string name, CancellationToken ct = default)
+    {
+        var userId = _currentUser.UserId;
+        var existing = await _campaignRepository.GetByUserAndNameAsync(userId, name, ct);
+        return Result<bool>.Success(existing is null);
+    }
+
 }

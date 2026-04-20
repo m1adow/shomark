@@ -1,6 +1,7 @@
 using ShoMark.Application.Common;
 using ShoMark.Application.DTOs.Analytics;
 using ShoMark.Application.Interfaces;
+using ShoMark.Application.Mappings;
 using ShoMark.Domain.Entities;
 using ShoMark.Domain.Interfaces;
 
@@ -21,16 +22,16 @@ public class AnalyticsService : IAnalyticsService
     {
         var analytics = await _analyticsRepository.GetByPostIdAsync(postId, ct);
         if (analytics is null)
-            return Result<AnalyticsDto>.Failure("Analytics not found", "NOT_FOUND");
+            return Result<AnalyticsDto>.Failure(Constants.Errors.Messages.AnalyticsNotFound, Constants.Errors.Codes.NotFound);
 
-        return Result<AnalyticsDto>.Success(MapToDto(analytics));
+        return Result<AnalyticsDto>.Success(analytics.ToDto());
     }
 
     public async Task<Result<AnalyticsDto>> UpsertAsync(Guid postId, UpdateAnalyticsRequest request, CancellationToken ct = default)
     {
         var post = await _postRepository.GetByIdAsync(postId, ct);
         if (post is null)
-            return Result<AnalyticsDto>.Failure("Post not found", "NOT_FOUND");
+            return Result<AnalyticsDto>.Failure(Constants.Errors.Messages.PostNotFound, Constants.Errors.Codes.NotFound);
 
         var analytics = await _analyticsRepository.GetByPostIdAsync(postId, ct);
 
@@ -46,7 +47,7 @@ public class AnalyticsService : IAnalyticsService
                 LastSyncedAt = DateTime.UtcNow
             };
             var created = await _analyticsRepository.AddAsync(analytics, ct);
-            return Result<AnalyticsDto>.Success(MapToDto(created));
+            return Result<AnalyticsDto>.Success(created.ToDto());
         }
 
         analytics.Views = request.Views;
@@ -56,10 +57,6 @@ public class AnalyticsService : IAnalyticsService
         analytics.LastSyncedAt = DateTime.UtcNow;
 
         await _analyticsRepository.UpdateAsync(analytics, ct);
-        return Result<AnalyticsDto>.Success(MapToDto(analytics));
+        return Result<AnalyticsDto>.Success(analytics.ToDto());
     }
-
-    private static AnalyticsDto MapToDto(Analytics a) => new(
-        a.Id, a.PostId, a.Views, a.Likes, a.Shares, a.Comments,
-        a.LastSyncedAt, a.CreatedAt, a.UpdatedAt);
 }

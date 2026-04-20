@@ -36,4 +36,7 @@ export const postsApi = {
 
   delete: (id: string, signal?: AbortSignal) =>
     del(`${PATH}/${id}`, signal),
+
+  publish: (id: string, signal?: AbortSignal) =>
+    post<PostDto>(`${PATH}/${id}/publish`, undefined, signal),
 };

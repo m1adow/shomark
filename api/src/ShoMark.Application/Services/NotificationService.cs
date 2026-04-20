@@ -2,6 +2,7 @@ using System.Text.Json;
 using ShoMark.Application.Common;
 using ShoMark.Application.DTOs.Notifications;
 using ShoMark.Application.Interfaces;
+using ShoMark.Application.Mappings;
 using ShoMark.Domain.Entities;
 using ShoMark.Domain.Enums;
 using ShoMark.Domain.Interfaces;
@@ -25,7 +26,7 @@ public class NotificationService : INotificationService
     {
         var notifications = await _notificationRepository.GetByUserIdAsync(userId, take, ct);
         return Result<IReadOnlyList<NotificationDto>>.Success(
-            notifications.Select(MapToDto).ToList());
+            notifications.Select(n => n.ToDto()).ToList());
     }
 
     public async Task<Result<int>> GetUnreadCountAsync(Guid userId, CancellationToken ct = default)
@@ -48,7 +49,7 @@ public class NotificationService : INotificationService
         };
 
         var created = await _notificationRepository.AddAsync(notification, ct);
-        var dto = MapToDto(created);
+        var dto = created.ToDto();
 
         var ssePayload = JsonSerializer.Serialize(dto);
         await _notifier.PublishAsync(userId, ssePayload);
@@ -60,7 +61,7 @@ public class NotificationService : INotificationService
     {
         var notification = await _notificationRepository.GetByIdAsync(id, ct);
         if (notification is null)
-            return Result<bool>.Failure("Notification not found", "NOT_FOUND");
+            return Result<bool>.Failure(Constants.Errors.Messages.NotificationNotFound, Constants.Errors.Codes.NotFound);
 
         await _notificationRepository.MarkAsReadAsync(id, ct);
         return Result<bool>.Success(true);
@@ -76,13 +77,10 @@ public class NotificationService : INotificationService
     {
         var notification = await _notificationRepository.GetByIdAsync(id, ct);
         if (notification is null)
-            return Result<bool>.Failure("Notification not found", "NOT_FOUND");
+            return Result<bool>.Failure(Constants.Errors.Messages.NotificationNotFound, Constants.Errors.Codes.NotFound);
 
         await _notificationRepository.DeleteAsync(id, ct);
         return Result<bool>.Success(true);
     }
 
-    private static NotificationDto MapToDto(Notification n) => new(
-        n.Id, n.UserId, n.Type.ToString(), n.Title, n.Message,
-        n.ReferenceId, n.IsRead, n.CreatedAt);
 }

@@ -12,6 +12,14 @@ html, body, #root {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+/* Transparent stepper — no background behind steps */
+.p-steps {
+  background: transparent !important;
+}
+.p-steps .p-steps-item .p-menuitem-link {
+  background: transparent !important;
+}
+
 /* Fix PrimeReact Steps number circle — Tailwind v4 preflight resets background */
 .p-steps .p-steps-item .p-menuitem-link .p-steps-number {
   background-color: #f8f9fa !important;
@@ -114,12 +122,8 @@ html, body, #root {
   flex-direction: column;
 }
 
-/* Disable date selection clicks on schedule calendar */
-.pointer-events-none-dates .p-datepicker td > span {
-  pointer-events: none;
-  cursor: default;
-}
-.pointer-events-none-dates .p-datepicker td > span.p-highlight {
-  background: transparent;
-  color: inherit;
+/* Pre-draft dot indicator on calendar */
+.pre-draft-dot {
+  opacity: 0.5;
+  border: 1px dashed currentColor;
 }

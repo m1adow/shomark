@@ -23,6 +23,7 @@ export const PostStatus = {
   Scheduled: 1,
   Published: 2,
   Failed: 3,
+  Publishing: 4,
 } as const;
 export type PostStatus = (typeof PostStatus)[keyof typeof PostStatus];
 
@@ -315,3 +316,11 @@ export interface ApiError {
   error: string;
   errorCode?: string;
 }
+
+// ── OAuth ────────────────────────────────────────────────────────────────────
+
+export interface OAuthConnectResponse {
+  authorizationUrl: string;
+}
+
+export type OAuthPlatform = 'Instagram' | 'TikTok' | 'YouTube' | 'X';

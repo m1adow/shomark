@@ -23,6 +23,9 @@ export const campaignsApi = {
   getByVideoId: (videoId: string, signal?: AbortSignal) =>
     get<CampaignDto[]>(`${PATH}/video/${videoId}`, signal),
 
+  checkName: (name: string, signal?: AbortSignal) =>
+    get<{ isAvailable: boolean }>(`${PATH}/check-name?name=${encodeURIComponent(name)}`, signal),
+
   delete: (id: string, signal?: AbortSignal) =>
     del(`${PATH}/${id}`, signal),
 };

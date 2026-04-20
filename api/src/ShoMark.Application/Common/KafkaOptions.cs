@@ -7,5 +7,6 @@ public class KafkaOptions
     public string BootstrapServers { get; set; } = "kafka:29092";
     public string VideoProcessingTopic { get; set; } = "video-processing";
     public string CompletionTopic { get; set; } = "video-processing-completed";
+    public string PostPublishingTopic { get; set; } = "post-publishing";
     public string ConsumerGroupId { get; set; } = "api-group";
 }

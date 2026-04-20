@@ -11,4 +11,5 @@ public interface ICampaignService
     Task<Result<CampaignDto>> CreateAsync(CreateCampaignRequest request, CancellationToken ct = default);
     Task<Result<CampaignDto>> UpdateAsync(Guid id, UpdateCampaignRequest request, CancellationToken ct = default);
     Task<Result<bool>> DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<Result<bool>> IsNameAvailableAsync(string name, CancellationToken ct = default);
 }

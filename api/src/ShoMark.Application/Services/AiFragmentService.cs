@@ -1,6 +1,7 @@
 using ShoMark.Application.Common;
 using ShoMark.Application.DTOs.Fragments;
 using ShoMark.Application.Interfaces;
+using ShoMark.Application.Mappings;
 using ShoMark.Domain.Entities;
 using ShoMark.Domain.Interfaces;
 
@@ -26,28 +27,28 @@ public class AiFragmentService : IAiFragmentService
     {
         var fragment = await _fragmentRepository.GetByIdAsync(id, ct);
         if (fragment is null)
-            return Result<AiFragmentDto>.Failure("Fragment not found", "NOT_FOUND");
+            return Result<AiFragmentDto>.Failure(Constants.Errors.Messages.FragmentNotFound, Constants.Errors.Codes.NotFound);
 
-        return Result<AiFragmentDto>.Success(MapToDto(fragment));
+        return Result<AiFragmentDto>.Success(fragment.ToDto());
     }
 
     public async Task<Result<IReadOnlyList<AiFragmentDto>>> GetByVideoIdAsync(Guid videoId, CancellationToken ct = default)
     {
         var fragments = await _fragmentRepository.GetByVideoIdAsync(videoId, ct);
         return Result<IReadOnlyList<AiFragmentDto>>.Success(
-            fragments.Select(MapToDto).ToList());
+            fragments.Select(f => f.ToDto()).ToList());
     }
 
     public async Task<Result<AiFragmentDetailDto>> GetWithDetailsAsync(Guid id, CancellationToken ct = default)
     {
         var fragment = await _fragmentRepository.GetWithDetailsAsync(id, ct);
         if (fragment is null)
-            return Result<AiFragmentDetailDto>.Failure("Fragment not found", "NOT_FOUND");
+            return Result<AiFragmentDetailDto>.Failure(Constants.Errors.Messages.FragmentNotFound, Constants.Errors.Codes.NotFound);
 
         var dto = new AiFragmentDetailDto(
             fragment.Id, fragment.VideoId, fragment.Description,
             fragment.StartTime, fragment.EndTime,
-            fragment.MinioKey, CalculateViralScore(fragment),
+            fragment.MinioKey, fragment.CalculateViralScore(),
             fragment.Hashtags, fragment.ThumbnailKey,
             fragment.IsApproved, fragment.CreatedAt,
             fragment.Posts.Select(p => new PostSummaryDto(p.Id, p.Title, p.Status.ToString())).ToList());
@@ -59,10 +60,10 @@ public class AiFragmentService : IAiFragmentService
     {
         var video = await _videoRepository.GetByIdAsync(request.VideoId, ct);
         if (video is null)
-            return Result<AiFragmentDto>.Failure("Video not found", "NOT_FOUND");
+            return Result<AiFragmentDto>.Failure(Constants.Errors.Messages.VideoNotFound, Constants.Errors.Codes.NotFound);
 
         if (request.StartTime >= request.EndTime)
-            return Result<AiFragmentDto>.Failure("StartTime must be less than EndTime", "VALIDATION_ERROR");
+            return Result<AiFragmentDto>.Failure(Constants.Errors.Messages.StartTimeMustBeLessThanEndTime, Constants.Errors.Codes.Validation);
 
         var fragment = new AiFragment
         {
@@ -77,21 +78,21 @@ public class AiFragmentService : IAiFragmentService
         };
 
         var created = await _fragmentRepository.AddAsync(fragment, ct);
-        return Result<AiFragmentDto>.Success(MapToDto(created));
+        return Result<AiFragmentDto>.Success(created.ToDto());
     }
 
     public async Task<Result<AiFragmentDto>> UpdateAsync(Guid id, UpdateAiFragmentRequest request, CancellationToken ct = default)
     {
         var fragment = await _fragmentRepository.GetByIdAsync(id, ct);
         if (fragment is null)
-            return Result<AiFragmentDto>.Failure("Fragment not found", "NOT_FOUND");
+            return Result<AiFragmentDto>.Failure(Constants.Errors.Messages.FragmentNotFound, Constants.Errors.Codes.NotFound);
 
         if (request.StartTime.HasValue || request.EndTime.HasValue)
         {
             var start = request.StartTime ?? fragment.StartTime;
             var end = request.EndTime ?? fragment.EndTime;
             if (start >= end)
-                return Result<AiFragmentDto>.Failure("StartTime must be less than EndTime", "VALIDATION_ERROR");
+                return Result<AiFragmentDto>.Failure(Constants.Errors.Messages.StartTimeMustBeLessThanEndTime, Constants.Errors.Codes.Validation);
         }
 
         if (request.Description is not null) fragment.Description = request.Description;
@@ -103,14 +104,14 @@ public class AiFragmentService : IAiFragmentService
         if (request.IsApproved.HasValue) fragment.IsApproved = request.IsApproved.Value;
 
         await _fragmentRepository.UpdateAsync(fragment, ct);
-        return Result<AiFragmentDto>.Success(MapToDto(fragment));
+        return Result<AiFragmentDto>.Success(fragment.ToDto());
     }
 
     public async Task<Result<bool>> DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var fragment = await _fragmentRepository.GetByIdAsync(id, ct);
         if (fragment is null)
-            return Result<bool>.Failure("Fragment not found", "NOT_FOUND");
+            return Result<bool>.Failure(Constants.Errors.Messages.FragmentNotFound, Constants.Errors.Codes.NotFound);
 
         await _fragmentRepository.DeleteAsync(id, ct);
         return Result<bool>.Success(true);
@@ -120,23 +121,17 @@ public class AiFragmentService : IAiFragmentService
     {
         var fragment = await _fragmentRepository.GetByIdAsync(id, ct);
         if (fragment is null)
-            return Result<string>.Failure("Fragment not found", "NOT_FOUND");
+            return Result<string>.Failure(Constants.Errors.Messages.FragmentNotFound, Constants.Errors.Codes.NotFound);
 
         if (string.IsNullOrEmpty(fragment.ThumbnailKey))
-            return Result<string>.Failure("No thumbnail available", "NOT_FOUND");
+            return Result<string>.Failure(Constants.Errors.Messages.NoThumbnailAvailable, Constants.Errors.Codes.NotFound);
 
         var url = await GetPresignedUrlAsync(fragment.ThumbnailKey, ct);
         if (url is null)
-            return Result<string>.Failure("Failed to generate thumbnail URL", "STORAGE_ERROR");
+            return Result<string>.Failure(Constants.Errors.Messages.ThumbnailUrlGenerationFailed, Constants.Errors.Codes.StorageError);
 
         return Result<string>.Success(url);
     }
-
-    private static AiFragmentDto MapToDto(AiFragment f) => new(
-        f.Id, f.VideoId, f.Description,
-        f.StartTime, f.EndTime,
-        f.MinioKey, CalculateViralScore(f), f.Hashtags,
-        f.ThumbnailKey, f.IsApproved, f.CreatedAt, f.UpdatedAt);
 
     private async Task<string?> GetPresignedUrlAsync(string? storageKey, CancellationToken ct)
     {
@@ -144,9 +139,9 @@ public class AiFragmentService : IAiFragmentService
         try
         {
             var parts = storageKey.Split('/', 2);
-            var bucket = parts.Length > 1 ? parts[0] : "highlights";
+            var bucket = parts.Length > 1 ? parts[0] : Constants.Storage.HighlightsBucket;
             var key = parts.Length > 1 ? parts[1] : storageKey;
-            return await _storageService.GetPresignedUrlAsync(bucket, key, 3600, ct);
+            return await _storageService.GetPresignedUrlAsync(bucket, key, Constants.Storage.DefaultPresignedUrlExpiry, ct);
         }
         catch
         {
@@ -154,30 +149,4 @@ public class AiFragmentService : IAiFragmentService
         }
     }
 
-    private static double CalculateViralScore(AiFragment f)
-    {
-        double baseScore = f.ViralScore.HasValue ? f.ViralScore.Value * 10.0 : 5.0;
-
-        double duration = f.EndTime - f.StartTime;
-        double durationFactor = duration switch
-        {
-            < 10 => 0.7,
-            < 15 => 0.85,
-            < 30 => 1.0,
-            < 60 => 0.95,
-            < 120 => 0.8,
-            _ => 0.6
-        };
-
-        double contentBonus = 0;
-        if (!string.IsNullOrWhiteSpace(f.Description)) contentBonus += 0.5;
-        if (!string.IsNullOrWhiteSpace(f.Hashtags))
-        {
-            var tagCount = f.Hashtags.Split([' ', ',', '#'], StringSplitOptions.RemoveEmptyEntries).Length;
-            contentBonus += Math.Min(tagCount * 0.2, 1.0);
-        }
-
-        double score = (baseScore * durationFactor) + contentBonus;
-        return Math.Round(Math.Clamp(score, 0, 10), 1);
-    }
 }

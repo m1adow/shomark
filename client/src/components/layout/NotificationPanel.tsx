@@ -8,10 +8,12 @@ interface NotificationPanelProps {
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
   onDelete: (id: string) => void;
+  onNavigate: (notification: NotificationDto) => void;
 }
 
 export interface NotificationPanelHandle {
   toggle: (e: React.SyntheticEvent) => void;
+  close: () => void;
 }
 
 function typeIcon(type: string) {
@@ -52,11 +54,12 @@ function timeAgo(dateStr: string) {
 }
 
 const NotificationPanel = forwardRef<NotificationPanelHandle, NotificationPanelProps>(
-  ({ notifications, onMarkAsRead, onMarkAllAsRead, onDelete }, ref) => {
+  ({ notifications, onMarkAsRead, onMarkAllAsRead, onDelete, onNavigate }, ref) => {
     const overlayRef = useRef<OverlayPanel>(null);
 
     useImperativeHandle(ref, () => ({
       toggle: (e: React.SyntheticEvent) => overlayRef.current?.toggle(e),
+      close: () => overlayRef.current?.hide(),
     }));
 
     const hasUnread = notifications.some((n) => !n.isRead);
@@ -64,8 +67,9 @@ const NotificationPanel = forwardRef<NotificationPanelHandle, NotificationPanelP
     const handleClick = useCallback(
       (n: NotificationDto) => {
         if (!n.isRead) onMarkAsRead(n.id);
+        onNavigate(n);
       },
-      [onMarkAsRead],
+      [onMarkAsRead, onNavigate],
     );
 
     return (
@@ -98,7 +102,7 @@ const NotificationPanel = forwardRef<NotificationPanelHandle, NotificationPanelP
               >
                 <button
                   type="button"
-                  className="flex-1 text-left flex items-start gap-3 hover:bg-gray-50/50 transition-colors -mx-1 px-1 rounded"
+                  className="flex-1 text-left flex items-start gap-3 cursor-pointer hover:bg-gray-50/50 transition-colors -mx-1 px-1 rounded"
                   onClick={() => handleClick(n)}
                 >
                   <i className={`${typeIcon(n.type)} ${typeColor(n.type)} text-lg mt-0.5`} />

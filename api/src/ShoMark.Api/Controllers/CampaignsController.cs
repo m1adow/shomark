@@ -19,6 +19,18 @@ public class CampaignsController : ControllerBase
         _currentUser = currentUser;
     }
 
+    [HttpGet("check-name")]
+    public async Task<IActionResult> CheckName([FromQuery] string name, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return BadRequest(new { error = "Name is required", errorCode = "VALIDATION" });
+
+        var result = await _campaignService.IsNameAvailableAsync(name, ct);
+        return result.IsSuccess
+            ? Ok(new { isAvailable = result.Value })
+            : BadRequest(new { result.Error, result.ErrorCode });
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetMyCampaigns(CancellationToken ct)
     {
