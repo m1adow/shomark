@@ -30,3 +30,4 @@ class Config:
     whisper_beam_size: int = int(os.getenv("WHISPER_BEAM_SIZE", "1"))
     map_chunks: int = int(os.getenv("MAP_CHUNKS", "3"))
     top_highlights: int = int(os.getenv("TOP_HIGHLIGHTS", "3"))
+    worker_concurrency: int = int(os.getenv("WORKER_CONCURRENCY", "2"))

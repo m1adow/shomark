@@ -2,6 +2,7 @@ import json
 import os
 import logging
 import shutil
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 from storage import StorageClient
@@ -53,7 +54,7 @@ class VideoHighlightService:
         target_audience = message.get("target_audience")
         description = message.get("description")
 
-        work_dir = f"/tmp/work/{os.path.basename(video_key)}"
+        work_dir = f"/tmp/work/{uuid.uuid4().hex}"
         local_video = os.path.join(work_dir, "source.mp4")
 
         try:
@@ -78,7 +79,7 @@ class VideoHighlightService:
 
             # 4. Cut clips
             logger.info("=== Step 4/5: Cutting clips ===")
-            clips = self._video_processor.cut_highlights(local_video, highlights)
+            clips = self._video_processor.cut_highlights(local_video, highlights, output_dir=os.path.join(work_dir, "highlights"))
 
             # 5. Upload
             logger.info("=== Step 5/5: Uploading %d clips ===", len(clips))
