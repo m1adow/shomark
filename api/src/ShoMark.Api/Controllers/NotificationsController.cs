@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ShoMark.Application.Common;
 using ShoMark.Application.Interfaces;
 
 namespace ShoMark.Api.Controllers;
@@ -64,7 +65,7 @@ public class NotificationsController : ControllerBase
     [HttpGet("stream")]
     public async Task Stream(CancellationToken ct)
     {
-        Response.Headers.ContentType = "text/event-stream";
+        Response.Headers.ContentType = Constants.ContentTypes.EventStream;
         Response.Headers.CacheControl = "no-cache";
         Response.Headers.Connection = "keep-alive";
 

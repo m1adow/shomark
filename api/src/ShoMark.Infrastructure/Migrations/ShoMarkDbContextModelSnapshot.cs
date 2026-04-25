@@ -55,14 +55,14 @@ namespace ShoMark.Infrastructure.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_approved");
 
-                    b.Property<string>("MinioKey")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("minio_key");
-
                     b.Property<double>("StartTime")
                         .HasColumnType("double precision")
                         .HasColumnName("start_time");
+
+                    b.Property<string>("StorageKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("storage_key");
 
                     b.Property<string>("ThumbnailKey")
                         .HasMaxLength(500)
@@ -434,16 +434,16 @@ namespace ShoMark.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("file_size");
 
-                    b.Property<string>("MinioKey")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("minio_key");
-
                     b.Property<string>("OriginalFileName")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("original_file_name");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("storage_key");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -459,7 +459,7 @@ namespace ShoMark.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("MinioKey")
+                    b.HasIndex("StorageKey")
                         .IsUnique();
 
                     b.ToTable("videos", (string)null);

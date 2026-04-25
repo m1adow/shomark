@@ -1,3 +1,15 @@
+---
+title: Keycloak Configuration Guide
+tags:
+  - auth
+  - setup
+  - infrastructure
+aliases:
+  - Keycloak Setup
+  - JWT Config
+created: 2026-04-25
+---
+
 # Keycloak Configuration Guide
 
 ## 1. Access Admin Console
@@ -72,3 +84,10 @@ Authorization: Bearer <access_token>
 | JWKS endpoint | `http://localhost:8180/realms/shomark/protocol/openid-connect/certs` |
 | API audience (appsettings) | `shomark-api` |
 | API authority (appsettings) | `http://keycloak:8080/realms/shomark` (docker) / `http://localhost:8180/realms/shomark` (dev) |
+
+---
+
+## See Also
+
+- [[social-media-integration]] — OAuth flow and publishing pipeline that uses these JWT tokens
+- [[index]] — Knowledge base home

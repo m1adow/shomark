@@ -3,9 +3,12 @@ import type {
   PlatformDto,
   CreatePlatformRequest,
   UpdatePlatformRequest,
+  OAuthConnectResponse,
+  OAuthPlatform,
 } from './types';
 
 const PATH = '/platforms';
+const OAUTH_PATH = '/oauth';
 
 export const platformsApi = {
   getAll: (signal?: AbortSignal) =>
@@ -22,4 +25,14 @@ export const platformsApi = {
 
   delete: (id: string, signal?: AbortSignal) =>
     del(`${PATH}/${id}`, signal),
+
+  // OAuth
+  getConnectUrl: (platform: OAuthPlatform, signal?: AbortSignal) =>
+    get<OAuthConnectResponse>(`${OAUTH_PATH}/${platform}/connect`, signal),
+
+  disconnect: (platform: OAuthPlatform, signal?: AbortSignal) =>
+    post<void>(`${OAUTH_PATH}/${platform}/disconnect`, undefined, signal),
+
+  refreshToken: (platform: OAuthPlatform, signal?: AbortSignal) =>
+    post<PlatformDto>(`${OAUTH_PATH}/${platform}/refresh`, undefined, signal),
 };

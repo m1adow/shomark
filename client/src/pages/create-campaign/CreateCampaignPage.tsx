@@ -1,8 +1,12 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Steps } from 'primereact/steps';
 import { Toast } from 'primereact/toast';
+import { ProgressSpinner } from 'primereact/progressspinner';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../auth';
+import { campaignsApi } from '../../api/campaigns';
+import { videosApi } from '../../api/videos';
 import { useCreateCampaign, useUpdateCampaign, useCampaign } from '../../hooks/useCampaigns';
 import { useUploadVideo, useProcessVideo, useVideoUrl } from '../../hooks/useVideos';
 import { useVideoFragments, useUpdateFragment } from '../../hooks/useFragments';
@@ -27,6 +31,7 @@ export default function CreateCampaignPage() {
   useAuth();
 
   const [activeStep, setActiveStep] = useState(0);
+  const [draftReady, setDraftReady] = useState(!editId);
 
   // ── Step 1 state ───────────────────────────────────────────────────────
   const [setupData, setSetupData] = useState<CampaignSetupData>({
@@ -64,14 +69,17 @@ export default function CreateCampaignPage() {
       setApprovedFragmentId(existingCampaign.fragmentId);
     }
 
-    // Determine latest step
+    // Determine latest step.
+    // If videoId exists but no fragmentId, defer draftReady to the fragment
+    // check effect below to avoid a visible step-1 → step-2 transition.
     if (existingCampaign.fragmentId) {
       setActiveStep(2);
-    } else if (existingCampaign.videoId) {
-      setActiveStep(1);
-    } else {
+      setDraftReady(true);
+    } else if (!existingCampaign.videoId) {
       setActiveStep(0);
+      setDraftReady(true);
     }
+    // else: has videoId but no fragmentId → fragment check effect sets draftReady
   }, [existingCampaign]);
 
   // ── Mutations ──────────────────────────────────────────────────────────
@@ -90,15 +98,33 @@ export default function CreateCampaignPage() {
     refetch: refetchFragments,
   } = useVideoFragments(videoId ?? '', !!videoId);
 
-  // When fragments load and one is already approved, jump to step 2
+  // When fragments load and one is already approved, jump to step 2 (new campaign flow).
   useEffect(() => {
+    if (editId) return; // handled by the draft step-determination effect below
     if (!fragments || fragments.length === 0) return;
     const approved = fragments.find((f) => f.isApproved);
     if (approved && !approvedFragmentId) {
       setApprovedFragmentId(approved.id);
       setActiveStep(2);
     }
-  }, [fragments, approvedFragmentId]);
+  }, [editId, fragments, approvedFragmentId]);
+
+  // For draft campaigns that have a video but no pre-selected fragment: wait until
+  // fragments are loaded before setting draftReady, so the correct step is shown
+  // immediately without a step-1 → step-2 transition.
+  useEffect(() => {
+    if (!editId || !existingCampaign?.videoId || existingCampaign?.fragmentId) return;
+    if (fragmentsLoading || fragments === null) return;
+    const approved = fragments.find((f) => f.isApproved);
+    if (approved) {
+      setApprovedFragmentId(approved.id);
+      setActiveStep(2);
+    } else {
+      setActiveStep(1);
+    }
+    setDraftReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId, existingCampaign, fragmentsLoading, fragments]);
 
   // Workaround: useVideoFragments doesn't support enabled, pass videoId conditionally
   const {
@@ -142,13 +168,32 @@ export default function CreateCampaignPage() {
   const handleStep1Next = useCallback(async () => {
     if (!setupData.file) return;
 
-    setUploading(true);
     setUploadError(null);
+
+    // Layer 1: validate name availability before any upload
+    if (setupData.name.trim()) {
+      try {
+        const { isAvailable } = await campaignsApi.checkName(setupData.name.trim());
+        if (!isAvailable) {
+          setUploadError('A campaign with this name already exists. Please choose a different name.');
+          return;
+        }
+      } catch {
+        setUploadError('Could not validate campaign name. Please try again.');
+        return;
+      }
+    }
+
+    setUploading(true);
     setUploadProgress(10);
+
+    // Layer 2: track uploaded video id for cleanup on failure
+    let uploadedVideoId: string | null = null;
 
     try {
       // 1. Upload video
       const video = await uploadVideo(setupData.file);
+      uploadedVideoId = video.id;
       setVideoId(video.id);
       setUploadProgress(50);
 
@@ -180,6 +225,12 @@ export default function CreateCampaignPage() {
       setActiveStep(1);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
+
+      // Layer 2: clean up the orphaned video if it was already uploaded
+      if (uploadedVideoId !== null) {
+        videosApi.delete(uploadedVideoId).catch(() => {});
+        setVideoId(null);
+      }
     } finally {
       setUploading(false);
     }
@@ -216,9 +267,9 @@ export default function CreateCampaignPage() {
     async (fragmentId: string, description: string) => {
       try {
         await updateFragment(fragmentId, { description });
-        refetchFragments();
       } catch {
         toast.current?.show({ severity: 'error', summary: 'Failed to update caption', life: 3000 });
+        refetchFragments();
       }
     },
     [updateFragment, refetchFragments],
@@ -228,9 +279,9 @@ export default function CreateCampaignPage() {
     async (fragmentId: string, hashtags: string) => {
       try {
         await updateFragment(fragmentId, { hashtags });
-        refetchFragments();
       } catch {
         toast.current?.show({ severity: 'error', summary: 'Failed to update hashtags', life: 3000 });
+        refetchFragments();
       }
     },
     [updateFragment, refetchFragments],
@@ -344,6 +395,21 @@ export default function CreateCampaignPage() {
     [campaign, approvedFragments, createPost, updateCampaign, navigate],
   );
 
+  const stepVariants = useMemo(() => ({
+    initial: { opacity: 0, x: 30 },
+    animate: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: -30 },
+  }), []);
+
+  // Show spinner while loading an existing draft to prevent step-0 flicker
+  if (editId && !draftReady) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center">
+        <ProgressSpinner style={{ width: '96px', height: '96px' }} />
+      </div>
+    );
+  }
+
   return (
     <div>
       <Toast ref={toast} />
@@ -361,45 +427,74 @@ export default function CreateCampaignPage() {
         className="mb-8"
       />
 
-      {activeStep === 0 && (
-        <StepCampaignSetup
-          data={setupData}
-          onChange={setSetupData}
-          onNext={handleStep1Next}
-          uploading={uploading}
-          uploadProgress={uploadProgress}
-          uploadError={uploadError}
-        />
-      )}
+      <AnimatePresence mode="wait" initial={false}>
+        {activeStep === 0 && (
+          <motion.div
+            key="step-0"
+            variants={stepVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          >
+            <StepCampaignSetup
+              data={setupData}
+              onChange={setSetupData}
+              onNext={handleStep1Next}
+              uploading={uploading}
+              uploadProgress={uploadProgress}
+              uploadError={uploadError}
+            />
+          </motion.div>
+        )}
 
-      {activeStep === 1 && (
-        <StepAiReview
-          fragments={fragments ?? []}
-          loading={fragmentsLoading}
-          error={fragmentsError}
-          videoUrl={videoUrlData?.url ?? null}
-          onApprove={handleApprove}
-          onUpdateCaption={handleUpdateCaption}
-          onUpdateHashtags={handleUpdateHashtags}
-          onRegenerate={handleRegenerate}
-          regenerating={regenerating}
-        />
-      )}
+        {activeStep === 1 && (
+          <motion.div
+            key="step-1"
+            variants={stepVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          >
+            <StepAiReview
+              fragments={fragments ?? []}
+              loading={fragmentsLoading}
+              error={fragmentsError}
+              videoUrl={videoUrlData?.url ?? null}
+              onApprove={handleApprove}
+              onUpdateCaption={handleUpdateCaption}
+              onUpdateHashtags={handleUpdateHashtags}
+              onRegenerate={handleRegenerate}
+              regenerating={regenerating}
+            />
+          </motion.div>
+        )}
 
-      {activeStep === 2 && (
-        <StepSchedulePublish
-          approvedFragments={approvedFragments}
-          platforms={platforms ?? []}
-          platformsLoading={platformsLoading}
-          scheduledPosts={[...(campaignPosts ?? []), ...(scheduledPosts ?? [])]}
-          onSchedule={handleSchedule}
-          onPublishNow={handlePublishNow}
-          onBack={handleBackFromSchedule}
-          onSaveAsDraft={handleSaveAsDraft}
-          publishing={publishing}
-          publishError={publishError}
-        />
-      )}
+        {activeStep === 2 && (
+          <motion.div
+            key="step-2"
+            variants={stepVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          >
+            <StepSchedulePublish
+              approvedFragments={approvedFragments}
+              platforms={platforms ?? []}
+              platformsLoading={platformsLoading}
+              scheduledPosts={[...(campaignPosts ?? []), ...(scheduledPosts ?? [])]}
+              onSchedule={handleSchedule}
+              onPublishNow={handlePublishNow}
+              onBack={handleBackFromSchedule}
+              onSaveAsDraft={handleSaveAsDraft}
+              publishing={publishing}
+              publishError={publishError}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

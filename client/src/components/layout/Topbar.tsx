@@ -3,6 +3,7 @@ import { Avatar } from 'primereact/avatar';
 import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
 import { useCallback, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import MobileSidebar from './MobileSidebar';
 import NotificationPanel, { type NotificationPanelHandle } from './NotificationPanel';
 import { useAuth } from '../../auth';
@@ -19,6 +20,7 @@ import type { NotificationDto } from '../../api/types';
 export default function Topbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const { data: notifications, refetch: refetchNotifications } = useNotifications();
   const { data: unreadData, refetch: refetchUnread } = useUnreadCount();
@@ -69,6 +71,15 @@ export default function Topbar() {
       refetchUnread();
     },
     [deleteNotification, refetchNotifications, refetchUnread],
+  );
+
+  const handleNavigate = useCallback(
+    (notification: NotificationDto) => {
+      if (!notification.referenceId) return;
+      navigate(`/campaigns/${notification.referenceId}`);
+      panelRef.current?.close();
+    },
+    [navigate],
   );
 
   return (
@@ -141,6 +152,7 @@ export default function Topbar() {
         onMarkAsRead={handleMarkAsRead}
         onMarkAllAsRead={handleMarkAllAsRead}
         onDelete={handleDelete}
+        onNavigate={handleNavigate}
       />
 
       <MobileSidebar

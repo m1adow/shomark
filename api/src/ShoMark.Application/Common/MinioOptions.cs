@@ -8,5 +8,5 @@ public class MinioOptions
     public string AccessKey { get; set; } = "admin";
     public string SecretKey { get; set; } = "password123";
     public bool Secure { get; set; }
-    public string VideoBucket { get; set; } = "videos";
+    public string? PublicEndpoint { get; set; }
 }

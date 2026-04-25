@@ -255,6 +255,9 @@ temp/
 *.rej
 
 # ===========================
-# GitHub Copilot Skills
+# AI Stuff
 # ===========================
 .github/skills/
+.agents/skills/
+
+knowledge/.obsidian/

@@ -9,12 +9,21 @@ namespace ShoMark.Infrastructure.Storage;
 public class MinioStorageService : IStorageService
 {
     private readonly IMinioClient _client;
+    private readonly IMinioClient _publicClient;
 
     public MinioStorageService(IOptions<MinioOptions> options)
     {
         var opts = options.Value;
         _client = new MinioClient()
             .WithEndpoint(opts.Endpoint)
+            .WithCredentials(opts.AccessKey, opts.SecretKey)
+            .WithSSL(opts.Secure)
+            .Build();
+
+        // Separate client for presigning — signs URLs with the public host so browsers can validate the signature
+        var publicEndpoint = opts.PublicEndpoint ?? opts.Endpoint;
+        _publicClient = new MinioClient()
+            .WithEndpoint(publicEndpoint)
             .WithCredentials(opts.AccessKey, opts.SecretKey)
             .WithSSL(opts.Secure)
             .Build();
@@ -41,9 +50,9 @@ public class MinioStorageService : IStorageService
         return $"{bucket}/{key}";
     }
 
-    public async Task<string> GetPresignedUrlAsync(string bucket, string key, int expirySeconds = 3600, CancellationToken ct = default)
+    public Task<string> GetPresignedUrlAsync(string bucket, string key, int expirySeconds = 3600, CancellationToken ct = default)
     {
-        return await _client.PresignedGetObjectAsync(new PresignedGetObjectArgs()
+        return _publicClient.PresignedGetObjectAsync(new PresignedGetObjectArgs()
             .WithBucket(bucket)
             .WithObject(key)
             .WithExpiry(expirySeconds));

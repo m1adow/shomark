@@ -20,7 +20,7 @@ class Config:
 
     # Ollama
     ollama_url: str = os.getenv("OLLAMA_URL", "http://ollama:11434/api/generate")
-    ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen3:30b-a3b")
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen3.5:9b")
 
     # Processing
     clip_duration: int = int(os.getenv("CLIP_DURATION", "60"))
@@ -30,3 +30,4 @@ class Config:
     whisper_beam_size: int = int(os.getenv("WHISPER_BEAM_SIZE", "1"))
     map_chunks: int = int(os.getenv("MAP_CHUNKS", "3"))
     top_highlights: int = int(os.getenv("TOP_HIGHLIGHTS", "3"))
+    worker_concurrency: int = int(os.getenv("WORKER_CONCURRENCY", "2"))

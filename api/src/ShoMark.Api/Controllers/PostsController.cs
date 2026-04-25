@@ -12,10 +12,12 @@ namespace ShoMark.Api.Controllers;
 public class PostsController : ControllerBase
 {
     private readonly IPostService _postService;
+    private readonly IPostPublishingService _publishingService;
 
-    public PostsController(IPostService postService)
+    public PostsController(IPostService postService, IPostPublishingService publishingService)
     {
         _postService = postService;
+        _publishingService = publishingService;
     }
 
     [HttpGet("{id:guid}")]
@@ -81,5 +83,12 @@ public class PostsController : ControllerBase
     {
         var result = await _postService.DeleteAsync(id, ct);
         return result.IsSuccess ? NoContent() : NotFound(new { result.Error, result.ErrorCode });
+    }
+
+    [HttpPost("{id:guid}/publish")]
+    public async Task<IActionResult> Publish(Guid id, CancellationToken ct)
+    {
+        var result = await _publishingService.PublishPostAsync(id, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.Error, result.ErrorCode });
     }
 }

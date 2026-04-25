@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using ShoMark.Application.Common;
 using ShoMark.Application.DTOs.Videos;
 using ShoMark.Application.Interfaces;
 
@@ -11,10 +13,12 @@ namespace ShoMark.Api.Controllers;
 public class VideosController : ControllerBase
 {
     private readonly IVideoService _videoService;
+    private readonly VideoOptions _videoOptions;
 
-    public VideosController(IVideoService videoService)
+    public VideosController(IVideoService videoService, IOptions<VideoOptions> videoOptions)
     {
         _videoService = videoService;
+        _videoOptions = videoOptions.Value;
     }
 
     [HttpGet]
@@ -82,12 +86,10 @@ public class VideosController : ControllerBase
     public async Task<IActionResult> Upload(IFormFile file, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
-            return BadRequest(new { Error = "No file provided", ErrorCode = "VALIDATION_ERROR" });
+            return BadRequest(new { Error = Constants.Errors.Messages.NoFileProvided, ErrorCode = Constants.Errors.Codes.Validation });
 
-        // TODO: Extract into appsettings
-        var allowedTypes = new[] { "video/mp4", "video/quicktime" };
-        if (!allowedTypes.Contains(file.ContentType))
-            return BadRequest(new { Error = "Only MP4 and MOV files are allowed", ErrorCode = "VALIDATION_ERROR" });
+        if (!_videoOptions.AllowedContentTypes.Contains(file.ContentType))
+            return BadRequest(new { Error = Constants.Errors.Messages.InvalidFileType, ErrorCode = Constants.Errors.Codes.Validation });
 
         await using var stream = file.OpenReadStream();
         var result = await _videoService.UploadAsync(stream, file.FileName, file.Length, file.ContentType, ct);
