@@ -1,3 +1,16 @@
+---
+title: OAuth Credentials Setup
+tags:
+  - oauth
+  - setup
+  - social-media
+  - credentials
+aliases:
+  - OAuth Setup
+  - Platform Credentials
+created: 2026-04-25
+---
+
 # OAuth Credentials Setup
 
 Step-by-step guide for obtaining `ClientId` and `ClientSecret` for each supported platform. After creating credentials, paste them into `appsettings.Development.json` (or environment variables in production) under the `OAuth` section.
@@ -181,3 +194,10 @@ Uses **X OAuth 2.0** with PKCE for the **X API v2**.
 - [ ] Complete app review / verification on each platform before going live.
 - [ ] Enable HTTPS for all redirect URIs in production (required by all platforms).
 - [ ] Configure ASP.NET Data Protection key persistence for production (e.g., Azure Blob Storage, Redis, or a shared file path).
+
+---
+
+## See Also
+
+- [[social-media-integration]] — Architecture overview of how these credentials are used in the publishing pipeline
+- [[index]] — Knowledge base home

@@ -9,10 +9,10 @@ public class VideoRepository : Repository<Video>, IVideoRepository
 {
     public VideoRepository(ShoMarkDbContext context) : base(context) { }
 
-    public async Task<Video?> GetByMinioKeyAsync(string minioKey, CancellationToken ct = default)
+    public async Task<Video?> GetByStorageKeyAsync(string storageKey, CancellationToken ct = default)
     {
         return await DbSet.AsNoTracking()
-            .FirstOrDefaultAsync(v => v.MinioKey == minioKey, ct);
+            .FirstOrDefaultAsync(v => v.StorageKey == storageKey, ct);
     }
 
     public async Task<IReadOnlyList<Video>> GetActiveVideosAsync(CancellationToken ct = default)

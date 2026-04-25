@@ -259,3 +259,5 @@ temp/
 # ===========================
 .github/skills/
 .agents/skills/
+
+knowledge/.obsidian/

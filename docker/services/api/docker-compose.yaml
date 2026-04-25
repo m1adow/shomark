@@ -24,3 +24,8 @@ services:
       - Keycloak__Audience=${KEYCLOAK_CLIENT_ID}
       - Keycloak__RequireHttpsMetadata=false
       - Cors__AllowedOrigins__0=http://localhost:${CLIENT_PORT}
+      - Minio__Endpoint=minio:9000
+      - Minio__AccessKey=${MINIO_ROOT_USER}
+      - Minio__SecretKey=${MINIO_ROOT_PASSWORD}
+      - Minio__Secure=false
+      - Minio__PublicEndpoint=localhost:${MINIO_API_PORT}

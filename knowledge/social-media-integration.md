@@ -1,3 +1,16 @@
+---
+title: Social Media Integration
+tags:
+  - oauth
+  - publishing
+  - architecture
+  - social-media
+aliases:
+  - Publishing Pipeline
+  - OAuth Architecture
+created: 2026-04-25
+---
+
 # Social Media Integration
 
 ShoMark supports publishing content to **Instagram** (Reels), **TikTok**, **YouTube Shorts**, and **X (Twitter)**. This document explains the architecture and how each piece fits together.
@@ -55,7 +68,7 @@ ShoMark supports publishing content to **Instagram** (Reels), **TikTok**, **YouT
 
 ## Token Security
 
-- Tokens are encrypted using `IDataProtector` with purpose string `"ShoMark.Tokens.v1"`.
+- Tokens are encrypted using `IDataProtector` with purpose string `"ShoMark.Tokens.v1"`. Authentication is handled by [[keycloak]] (JWT Bearer).
 - Keys are stored via the default ASP.NET Data Protection key ring (`PersistKeysToFileSystem` or similar provider should be configured for production).
 - Tokens are only decrypted at publish time and during refresh — they are never returned in plain text to the frontend.
 - Auto-refresh: if a token expires within 5 minutes, the system automatically refreshes it before publishing.
@@ -111,7 +124,7 @@ All OAuth settings live in `appsettings.json` under the `OAuth` section:
 }
 ```
 
-See [oauth-credentials.md](oauth-credentials.md) for instructions on obtaining `ClientId` and `ClientSecret` for each platform.
+See [[oauth-credentials]] for instructions on obtaining `ClientId` and `ClientSecret` for each platform.
 
 ## Frontend
 
@@ -123,3 +136,11 @@ See [oauth-credentials.md](oauth-credentials.md) for instructions on obtaining `
 | `hooks/usePlatforms.ts` | `useConnectPlatform`, `useDisconnectPlatform`, `useRefreshPlatformToken` |
 | `api/posts.ts` | `publish(id)` — immediate publish |
 | `hooks/usePosts.ts` | `usePublishPost` hook |
+
+---
+
+## See Also
+
+- [[oauth-credentials]] — Step-by-step guide to obtaining platform credentials
+- [[keycloak]] — JWT authentication used to protect all API endpoints
+- [[index]] — Knowledge base home

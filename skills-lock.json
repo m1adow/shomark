@@ -1,6 +1,26 @@
 {
   "version": 1,
   "skills": {
+    "azure-compute": {
+      "source": "microsoft/azure-skills",
+      "sourceType": "github",
+      "computedHash": "fb6a8fb3578c21c47e2ad794e0fe67d08a1f3c39912d286a9fdfd3a550d8b3b4"
+    },
+    "azure-cost": {
+      "source": "microsoft/azure-skills",
+      "sourceType": "github",
+      "computedHash": "c2e6430e746847f0dbb5a2040f56f364972c6d5a996a24852ccc0bc981fcb4d9"
+    },
+    "azure-deploy": {
+      "source": "microsoft/azure-skills",
+      "sourceType": "github",
+      "computedHash": "7b62a5c55c7d83434fd1ef68b145281cf3e7ed6b01b4093c51d87111cc2e8309"
+    },
+    "azure-prepare": {
+      "source": "microsoft/azure-skills",
+      "sourceType": "github",
+      "computedHash": "4b8d5098ca167f4d82b1a9e424a9f5b78893cb382489b65030a4a0aef1e436ab"
+    },
     "database-schema-design": {
       "source": "supercent-io/skills-template",
       "sourceType": "github",

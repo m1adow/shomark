@@ -12,7 +12,7 @@ namespace ShoMark.Application.Mappings;
 public static class DtoMappingExtensions
 {
     public static VideoDto ToDto(this Video v) => new(
-        v.Id, v.Title, v.MinioKey, v.OriginalFileName,
+        v.Id, v.Title, v.StorageKey, v.OriginalFileName,
         v.DurationSeconds, v.FileSize, v.CreatedAt, v.UpdatedAt);
 
     public static CampaignDto ToDto(this Campaign c) => new(
@@ -35,7 +35,7 @@ public static class DtoMappingExtensions
     public static AiFragmentDto ToDto(this AiFragment f) => new(
         f.Id, f.VideoId, f.Description,
         f.StartTime, f.EndTime,
-        f.MinioKey, f.CalculateViralScore(), f.Hashtags,
+        f.StorageKey, f.CalculateViralScore(), f.Hashtags,
         f.ThumbnailKey, f.IsApproved, f.CreatedAt, f.UpdatedAt);
 
     public static PlatformDto ToDto(this Platform p) => new(

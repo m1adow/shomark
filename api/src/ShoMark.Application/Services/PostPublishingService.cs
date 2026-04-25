@@ -92,9 +92,9 @@ public class PostPublishingService : IPostPublishingService
         string? mediaUrl = null;
         string? mediaContentType = Constants.ContentTypes.VideoMp4;
         var fragment = await _fragmentRepository.GetByIdAsync(post.FragmentId, ct);
-        if (fragment?.MinioKey is not null)
+        if (fragment?.StorageKey is not null)
         {
-            var parts = fragment.MinioKey.Split('/', 2);
+            var parts = fragment.StorageKey.Split('/', 2);
             if (parts.Length == 2)
             {
                 mediaUrl = await _storageService.GetPresignedUrlAsync(parts[0], parts[1], Constants.Storage.DefaultPresignedUrlExpiry, ct);

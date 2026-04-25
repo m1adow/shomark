@@ -13,18 +13,18 @@ public class VideoService : IVideoService
     private readonly IVideoRepository _videoRepository;
     private readonly IVideoProcessingProducer _processingProducer;
     private readonly IStorageService _storageService;
-    private readonly MinioOptions _minioOptions;
+    private readonly StorageOptions _storageOptions;
 
     public VideoService(
         IVideoRepository videoRepository,
         IVideoProcessingProducer processingProducer,
         IStorageService storageService,
-        IOptions<MinioOptions> minioOptions)
+        IOptions<StorageOptions> storageOptions)
     {
         _videoRepository = videoRepository;
         _processingProducer = processingProducer;
         _storageService = storageService;
-        _minioOptions = minioOptions.Value;
+        _storageOptions = storageOptions.Value;
     }
 
     public async Task<Result<VideoDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -50,25 +50,25 @@ public class VideoService : IVideoService
             return Result<VideoWithFragmentsDto>.Failure(Constants.Errors.Messages.VideoNotFound, Constants.Errors.Codes.NotFound);
 
         var dto = new VideoWithFragmentsDto(
-            video.Id, video.Title, video.MinioKey, video.OriginalFileName,
+            video.Id, video.Title, video.StorageKey, video.OriginalFileName,
             video.DurationSeconds, video.FileSize, video.CreatedAt,
             video.Fragments.Select(f => new FragmentSummaryDto(
                 f.Id, f.Description, f.StartTime, f.EndTime,
-                f.MinioKey, f.ViralScore, f.Hashtags, f.ThumbnailKey, f.IsApproved)).ToList());
+                f.StorageKey, f.ViralScore, f.Hashtags, f.ThumbnailKey, f.IsApproved)).ToList());
 
         return Result<VideoWithFragmentsDto>.Success(dto);
     }
 
     public async Task<Result<VideoDto>> CreateAsync(CreateVideoRequest request, CancellationToken ct = default)
     {
-        var existing = await _videoRepository.GetByMinioKeyAsync(request.MinioKey, ct);
+        var existing = await _videoRepository.GetByStorageKeyAsync(request.StorageKey, ct);
         if (existing is not null)
             return Result<VideoDto>.Failure(Constants.Errors.Messages.DuplicateVideo, Constants.Errors.Codes.Duplicate);
 
         var video = new Video
         {
             Title = request.Title,
-            MinioKey = request.MinioKey,
+            StorageKey = request.StorageKey,
             OriginalFileName = request.OriginalFileName,
             DurationSeconds = request.DurationSeconds,
             FileSize = request.FileSize
@@ -111,10 +111,10 @@ public class VideoService : IVideoService
         if (video is null)
             return Result<bool>.Failure(Constants.Errors.Messages.VideoNotFound, Constants.Errors.Codes.NotFound);
 
-        // Parse bucket and key from the MinIO key (format: "bucket/key" or just "key")
-        var parts = video.MinioKey.Split('/', 2);
+        // Parse bucket and key from the storage key (format: "bucket/key" or just "key")
+        var parts = video.StorageKey.Split('/', 2);
         var videoBucket = parts.Length > 1 ? parts[0] : Constants.Storage.VideosBucket;
-        var videoKey = parts.Length > 1 ? parts[1] : video.MinioKey;
+        var videoKey = parts.Length > 1 ? parts[1] : video.StorageKey;
 
         var outputBucket = request.OutputBucket ?? Constants.Storage.HighlightsBucket;
         var outputPrefix = request.OutputPrefix ?? $"{video.Id}/";
@@ -131,7 +131,7 @@ public class VideoService : IVideoService
         var videoId = Guid.NewGuid();
         var extension = Path.GetExtension(fileName);
         var key = $"{videoId}{extension}";
-        var bucket = _minioOptions.VideoBucket;
+        var bucket = _storageOptions.VideoBucket;
 
         await _storageService.UploadFileAsync(fileStream, bucket, key, contentType, ct);
 
@@ -139,7 +139,7 @@ public class VideoService : IVideoService
         {
             Id = videoId,
             Title = Path.GetFileNameWithoutExtension(fileName),
-            MinioKey = $"{bucket}/{key}",
+            StorageKey = $"{bucket}/{key}",
             OriginalFileName = fileName,
             FileSize = fileSize
         };
@@ -154,9 +154,9 @@ public class VideoService : IVideoService
         if (video is null)
             return Result<string>.Failure(Constants.Errors.Messages.VideoNotFound, Constants.Errors.Codes.NotFound);
 
-        var parts = video.MinioKey.Split('/', 2);
-        var bucket = parts.Length > 1 ? parts[0] : _minioOptions.VideoBucket;
-        var key = parts.Length > 1 ? parts[1] : video.MinioKey;
+        var parts = video.StorageKey.Split('/', 2);
+        var bucket = parts.Length > 1 ? parts[0] : _storageOptions.VideoBucket;
+        var key = parts.Length > 1 ? parts[1] : video.StorageKey;
 
         var url = await _storageService.GetPresignedUrlAsync(bucket, key, 3600, ct);
         return Result<string>.Success(url);

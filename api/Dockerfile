@@ -5,6 +5,7 @@ EXPOSE 8080
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
+COPY ["Directory.Packages.props", "."]
 COPY ["src/ShoMark.Domain/ShoMark.Domain.csproj", "ShoMark.Domain/"]
 COPY ["src/ShoMark.Application/ShoMark.Application.csproj", "ShoMark.Application/"]
 COPY ["src/ShoMark.Infrastructure/ShoMark.Infrastructure.csproj", "ShoMark.Infrastructure/"]

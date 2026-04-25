@@ -20,7 +20,7 @@ class Config:
 
     # Ollama
     ollama_url: str = os.getenv("OLLAMA_URL", "http://ollama:11434/api/generate")
-    ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen3:30b-a3b")
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen3.5:9b")
 
     # Processing
     clip_duration: int = int(os.getenv("CLIP_DURATION", "60"))

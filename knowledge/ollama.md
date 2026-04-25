@@ -1,3 +1,16 @@
+---
+title: Ollama Configuration Guide
+tags:
+  - ai
+  - llm
+  - setup
+  - infrastructure
+aliases:
+  - Ollama Setup
+  - LLM Config
+created: 2026-04-25
+---
+
 # Ollama Configuration Guide
 
 Ollama runs locally as a containerized LLM inference server. The worker service uses it to generate marketing text via the `/api/generate` endpoint.
@@ -20,10 +33,10 @@ The container exposes port **11434** and persists model data in the `ollama_data
 After the container is running, pull a model into it:
 
 ```bash
-docker exec -it ollama ollama pull qwen3:30b-a3b
+docker exec -it ollama ollama pull qwen3.5:9b
 ```
 
-Replace `qwen3:30b-a3b` with any model from [ollama.com/library](https://ollama.com/library).
+Replace `qwen3.5:9b` with any model from [ollama.com/library](https://ollama.com/library).
 
 To verify the model was installed:
 
@@ -34,7 +47,7 @@ docker exec -it ollama ollama list
 To remove a model:
 
 ```bash
-docker exec -it ollama ollama rm qwen3:30b-a3b
+docker exec -it ollama ollama rm qwen3.5:9b
 ```
 
 ## 3. Configure the Worker
@@ -44,12 +57,12 @@ The worker reads two environment variables:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OLLAMA_URL` | `http://ollama:11434/api/generate` | Ollama generate endpoint (inside Docker network) |
-| `OLLAMA_MODEL` | `qwen3:30b-a3b` | Model name passed in every request |
+| `OLLAMA_MODEL` | `qwen3.5:9b` | Model name passed in every request |
 
 Set `OLLAMA_MODEL` in your `.env` file (used by `docker/services/docker-compose.yaml`):
 
 ```env
-OLLAMA_MODEL=qwen3:30b-a3b
+OLLAMA_MODEL=qwen3.5:9b
 ```
 
 To use a different model, pull it first (step 2) and then update `OLLAMA_MODEL`.
@@ -62,7 +75,7 @@ From the host machine:
 curl http://localhost:11434/api/generate \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "qwen3:30b-a3b",
+    "model": "qwen3.5:9b",
     "prompt": "Write a short Instagram post about a career fair.",
     "stream": false
   }'
@@ -78,5 +91,5 @@ Expected response contains a `"response"` field with the generated text.
 | API port | `11434` |
 | Generate endpoint | `http://localhost:11434/api/generate` |
 | Model storage volume | `ollama_data` → `/root/.ollama` |
-| Default model | `qwen3:30b-a3b` |
+| Default model | `qwen3.5:9b` |
 | Compose file | `docker/infrastructure/ollama/docker-compose.yaml` |

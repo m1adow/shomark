@@ -95,10 +95,20 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<PostSchedulerBackgroundService>();
         services.AddHostedService<KafkaPostPublishingConsumer>();
 
-        // MinIO Storage
+        // Object Storage (provider-switchable via Storage:Provider config)
+        services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.Configure<MinioOptions>(configuration.GetSection(MinioOptions.SectionName));
+        services.Configure<AzureBlobOptions>(configuration.GetSection(AzureBlobOptions.SectionName));
         services.Configure<VideoOptions>(configuration.GetSection(VideoOptions.SectionName));
-        services.AddSingleton<IStorageService, MinioStorageService>();
+
+        var storageProvider = configuration
+            .GetSection(StorageOptions.SectionName)
+            .GetValue<StorageProvider>(nameof(StorageOptions.Provider));
+
+        if (storageProvider == StorageProvider.AzureBlob)
+            services.AddSingleton<IStorageService, AzureBlobStorageService>();
+        else
+            services.AddSingleton<IStorageService, MinioStorageService>();
 
         // Authentication (Keycloak)
         var keycloakOptions = configuration

@@ -111,7 +111,7 @@ public class KafkaCompletionConsumer : BackgroundService
         var videoBucket = root.GetProperty("video_bucket").GetString()!;
         var videoKey = root.GetProperty("video_key").GetString()!;
         var outputBucket = root.GetProperty("output_bucket").GetString()!;
-        var minioKey = $"{videoBucket}/{videoKey}";
+        var storageKey = $"{videoBucket}/{videoKey}";
 
         _logger.LogInformation("Processing completion for video: {VideoKey}", videoKey);
 
@@ -125,8 +125,8 @@ public class KafkaCompletionConsumer : BackgroundService
         var videoRepo = scope.ServiceProvider.GetRequiredService<IVideoRepository>();
         var fragmentRepo = scope.ServiceProvider.GetRequiredService<IAiFragmentRepository>();
 
-        // Find the source video by MinIO key
-        var video = await videoRepo.GetByMinioKeyAsync(minioKey, ct);
+        // Find the source video by storage key
+        var video = await videoRepo.GetByStorageKeyAsync(storageKey, ct);
         if (video is null)
         {
             _logger.LogWarning("Video not found for key {VideoKey} — skipping", videoKey);
@@ -150,7 +150,7 @@ public class KafkaCompletionConsumer : BackgroundService
                 Description = title,
                 StartTime = start,
                 EndTime = end,
-                MinioKey = $"{outputBucket}/{clipKey}",
+                StorageKey = $"{outputBucket}/{clipKey}",
                 ThumbnailKey = previewKey is not null ? $"{outputBucket}/{previewKey}" : null,
                 ViralScore = viralScore,
                 Hashtags = hashtags,

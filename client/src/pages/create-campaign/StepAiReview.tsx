@@ -308,7 +308,7 @@ export default function StepAiReview({
             transition={{ duration: 0.5 }}
           >
             <div className="flex flex-col items-center gap-3 bg-white/80 backdrop-blur-sm rounded-2xl px-8 py-6 shadow-lg">
-              <motion.i
+              <motion.span
                 className="pi pi-star-fill text-3xl text-purple-600"
                 animate={{ rotate: 360, scale: [1, 1.15, 1] }}
                 transition={{
@@ -481,7 +481,7 @@ export default function StepAiReview({
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg z-10 gap-3"
             >
-              <motion.i
+              <motion.span
                 animate={{ rotate: 360 }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                 className="pi pi-cog text-4xl text-purple-600"

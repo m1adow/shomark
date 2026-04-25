@@ -48,7 +48,7 @@ public class AiFragmentService : IAiFragmentService
         var dto = new AiFragmentDetailDto(
             fragment.Id, fragment.VideoId, fragment.Description,
             fragment.StartTime, fragment.EndTime,
-            fragment.MinioKey, fragment.CalculateViralScore(),
+            fragment.StorageKey, fragment.CalculateViralScore(),
             fragment.Hashtags, fragment.ThumbnailKey,
             fragment.IsApproved, fragment.CreatedAt,
             fragment.Posts.Select(p => new PostSummaryDto(p.Id, p.Title, p.Status.ToString())).ToList());
@@ -71,7 +71,7 @@ public class AiFragmentService : IAiFragmentService
             Description = request.Description,
             StartTime = request.StartTime,
             EndTime = request.EndTime,
-            MinioKey = request.MinioKey,
+            StorageKey = request.StorageKey,
             ViralScore = request.ViralScore,
             Hashtags = request.Hashtags,
             ThumbnailKey = request.ThumbnailKey
@@ -98,7 +98,7 @@ public class AiFragmentService : IAiFragmentService
         if (request.Description is not null) fragment.Description = request.Description;
         if (request.StartTime.HasValue) fragment.StartTime = request.StartTime.Value;
         if (request.EndTime.HasValue) fragment.EndTime = request.EndTime.Value;
-        if (request.MinioKey is not null) fragment.MinioKey = request.MinioKey;
+        if (request.StorageKey is not null) fragment.StorageKey = request.StorageKey;
         if (request.ViralScore.HasValue) fragment.ViralScore = request.ViralScore.Value;
         if (request.Hashtags is not null) fragment.Hashtags = request.Hashtags;
         if (request.IsApproved.HasValue) fragment.IsApproved = request.IsApproved.Value;

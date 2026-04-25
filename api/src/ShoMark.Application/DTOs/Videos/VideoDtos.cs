@@ -3,7 +3,7 @@ namespace ShoMark.Application.DTOs.Videos;
 public record VideoDto(
     Guid Id,
     string Title,
-    string MinioKey,
+    string StorageKey,
     string? OriginalFileName,
     double? DurationSeconds,
     long? FileSize,
@@ -12,7 +12,7 @@ public record VideoDto(
 
 public record CreateVideoRequest(
     string Title,
-    string MinioKey,
+    string StorageKey,
     string? OriginalFileName,
     double? DurationSeconds,
     long? FileSize);
@@ -26,7 +26,7 @@ public record UpdateVideoRequest(
 public record VideoWithFragmentsDto(
     Guid Id,
     string Title,
-    string MinioKey,
+    string StorageKey,
     string? OriginalFileName,
     double? DurationSeconds,
     long? FileSize,
@@ -38,7 +38,7 @@ public record FragmentSummaryDto(
     string? Description,
     double StartTime,
     double EndTime,
-    string? MinioKey,
+    string? StorageKey,
     double? ViralScore,
     string? Hashtags,
     string? ThumbnailKey,
