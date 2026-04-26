@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using ShoMark.Application.Common;
 using ShoMark.Application.DTOs.OAuth;
@@ -8,8 +10,8 @@ using ShoMark.Domain.Enums;
 namespace ShoMark.Infrastructure.OAuth;
 
 /// <summary>
-/// TikTok OAuth via Login Kit.
-/// Auth endpoint: https://www.tiktok.com/v2/auth/authorize/
+/// TikTok OAuth via Login Kit v2 with PKCE (required by TikTok).
+/// Auth endpoint:  https://www.tiktok.com/v2/auth/authorize/
 /// Token endpoint: https://open.tiktokapis.com/v2/oauth/token/
 /// </summary>
 public class TikTokOAuthProvider : IOAuthProvider
@@ -20,31 +22,42 @@ public class TikTokOAuthProvider : IOAuthProvider
 
     public PlatformType SupportedPlatform => PlatformType.TikTok;
 
-    public string GetAuthorizationUrl(OAuthPlatformConfig config, string state)
+    public OAuthAuthorizationResult GetAuthorizationUrl(OAuthPlatformConfig config, string state)
     {
+        var codeVerifier = GenerateCodeVerifier();
+        var codeChallenge = GenerateCodeChallenge(codeVerifier);
+
         var scopes = Uri.EscapeDataString(config.Scopes);
-        return $"https://www.tiktok.com/v2/auth/authorize/" +
-               $"?client_key={config.ClientId}" +
-               $"&redirect_uri={Uri.EscapeDataString(config.RedirectUri)}" +
-               $"&scope={scopes}" +
-               $"&state={state}" +
-               $"&response_type=code";
+        var url = $"https://www.tiktok.com/v2/auth/authorize/" +
+                  $"?client_key={config.ClientId}" +
+                  $"&redirect_uri={Uri.EscapeDataString(config.RedirectUri)}" +
+                  $"&scope={scopes}" +
+                  $"&state={state}" +
+                  $"&response_type=code" +
+                  $"&code_challenge={codeChallenge}" +
+                  $"&code_challenge_method=S256";
+
+        return new OAuthAuthorizationResult(url, codeVerifier);
     }
 
-    public async Task<OAuthTokenResult> ExchangeCodeAsync(OAuthPlatformConfig config, string code, CancellationToken ct = default)
+    public async Task<OAuthTokenResult> ExchangeCodeAsync(OAuthPlatformConfig config, string code, string? codeVerifier, CancellationToken ct = default)
     {
-        var payload = new
+        var form = new Dictionary<string, string>
         {
-            client_key = config.ClientId,
-            client_secret = config.ClientSecret,
-            code,
-            grant_type = "authorization_code",
-            redirect_uri = config.RedirectUri
+            ["client_key"] = config.ClientId,
+            ["client_secret"] = config.ClientSecret,
+            ["code"] = code,
+            ["grant_type"] = "authorization_code",
+            ["redirect_uri"] = config.RedirectUri,
+            ["code_verifier"] = codeVerifier ?? string.Empty
         };
 
-        var response = await _http.PostAsJsonAsync("https://open.tiktokapis.com/v2/oauth/token/", payload, ct);
+        var response = await _http.PostAsync("https://open.tiktokapis.com/v2/oauth/token/", new FormUrlEncodedContent(form), ct);
         response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        var root = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+
+        // TikTok v2 wraps the token payload under a "data" key
+        var json = root.TryGetProperty("data", out var data) ? data : root;
 
         var accessToken = json.GetProperty("access_token").GetString()!;
         var refreshToken = json.TryGetProperty("refresh_token", out var rt) ? rt.GetString() : null;
@@ -58,17 +71,20 @@ public class TikTokOAuthProvider : IOAuthProvider
 
     public async Task<OAuthTokenResult> RefreshTokenAsync(OAuthPlatformConfig config, string refreshToken, CancellationToken ct = default)
     {
-        var payload = new
+        var form = new Dictionary<string, string>
         {
-            client_key = config.ClientId,
-            client_secret = config.ClientSecret,
-            grant_type = "refresh_token",
-            refresh_token = refreshToken
+            ["client_key"] = config.ClientId,
+            ["client_secret"] = config.ClientSecret,
+            ["grant_type"] = "refresh_token",
+            ["refresh_token"] = refreshToken
         };
 
-        var response = await _http.PostAsJsonAsync("https://open.tiktokapis.com/v2/oauth/token/", payload, ct);
+        var response = await _http.PostAsync("https://open.tiktokapis.com/v2/oauth/token/", new FormUrlEncodedContent(form), ct);
         response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        var root = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+
+        // TikTok v2 wraps the token payload under a "data" key
+        var json = root.TryGetProperty("data", out var data) ? data : root;
 
         var accessToken = json.GetProperty("access_token").GetString()!;
         var newRefreshToken = json.TryGetProperty("refresh_token", out var rt) ? rt.GetString() : refreshToken;
@@ -94,5 +110,17 @@ public class TikTokOAuthProvider : IOAuthProvider
         }
 
         return null;
+    }
+
+    private static string GenerateCodeVerifier()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static string GenerateCodeChallenge(string codeVerifier)
+    {
+        var hash = SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier));
+        return Convert.ToBase64String(hash).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 }

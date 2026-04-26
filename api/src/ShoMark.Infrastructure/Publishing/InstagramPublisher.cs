@@ -9,8 +9,9 @@ using ShoMark.Domain.Enums;
 namespace ShoMark.Infrastructure.Publishing;
 
 /// <summary>
-/// Publishes content to Instagram via Facebook Graph API (Reels / Single Media).
-/// Flow: 1) Create media container  2) Poll for ready  3) Publish container
+/// Publishes content to Instagram via Instagram Login (graph.instagram.com).
+/// Flow: 1) Resolve IG user ID from /me  2) Create media container
+///       3) Poll container until FINISHED  4) Publish container
 /// Docs: https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/content-publishing
 /// </summary>
 public class InstagramPublisher : ISocialMediaPublisher
@@ -30,29 +31,23 @@ public class InstagramPublisher : ISocialMediaPublisher
     {
         try
         {
-            // Get Instagram business account ID
-            var igAccountId = await GetInstagramAccountIdAsync(request.AccessToken, ct);
-            if (igAccountId is null)
-                return new PublishResult(false, null, null, "Could not resolve Instagram business account ID");
+            // Resolve the Instagram user ID from the access token
+            var igUserId = await GetInstagramUserIdAsync(request.AccessToken, ct);
+            if (igUserId is null)
+                return new PublishResult(false, null, null, "Could not resolve Instagram user ID");
 
             // Step 1: Create media container
             string containerId;
             if (request.MediaUrl is not null && request.MediaContentType?.StartsWith("video") == true)
-            {
-                // Reel (video)
-                containerId = await CreateReelContainerAsync(igAccountId, request, ct);
-            }
+                containerId = await CreateReelContainerAsync(igUserId, request, ct);
             else
-            {
-                // Single image post
-                containerId = await CreateImageContainerAsync(igAccountId, request, ct);
-            }
+                containerId = await CreateImageContainerAsync(igUserId, request, ct);
 
             // Step 2: Wait for container to be ready (poll status)
             await WaitForContainerReadyAsync(containerId, request.AccessToken, ct);
 
             // Step 3: Publish the container
-            var publishUrl = $"https://graph.facebook.com/v21.0/{igAccountId}/media_publish" +
+            var publishUrl = $"https://graph.instagram.com/v21.0/{igUserId}/media_publish" +
                              $"?creation_id={containerId}" +
                              $"&access_token={request.AccessToken}";
 
@@ -71,27 +66,17 @@ public class InstagramPublisher : ISocialMediaPublisher
         }
     }
 
-    private async Task<string?> GetInstagramAccountIdAsync(string accessToken, CancellationToken ct)
+    private async Task<string?> GetInstagramUserIdAsync(string accessToken, CancellationToken ct)
     {
-        var url = $"https://graph.facebook.com/v21.0/me/accounts?access_token={accessToken}";
+        var url = $"https://graph.instagram.com/me?fields=id&access_token={accessToken}";
         var response = await _http.GetFromJsonAsync<JsonElement>(url, ct);
-
-        if (response.TryGetProperty("data", out var data) && data.GetArrayLength() > 0)
-        {
-            var pageId = data[0].GetProperty("id").GetString()!;
-            var igUrl = $"https://graph.facebook.com/v21.0/{pageId}?fields=instagram_business_account&access_token={accessToken}";
-            var igResponse = await _http.GetFromJsonAsync<JsonElement>(igUrl, ct);
-
-            if (igResponse.TryGetProperty("instagram_business_account", out var igAccount))
-                return igAccount.GetProperty("id").GetString();
-        }
-        return null;
+        return response.TryGetProperty("id", out var id) ? id.GetString() : null;
     }
 
-    private async Task<string> CreateReelContainerAsync(string igAccountId, PublishRequest request, CancellationToken ct)
+    private async Task<string> CreateReelContainerAsync(string igUserId, PublishRequest request, CancellationToken ct)
     {
         var caption = BuildCaption(request);
-        var url = $"https://graph.facebook.com/v21.0/{igAccountId}/media" +
+        var url = $"https://graph.instagram.com/v21.0/{igUserId}/media" +
                   $"?media_type=REELS" +
                   $"&video_url={Uri.EscapeDataString(request.MediaUrl!)}" +
                   $"&caption={Uri.EscapeDataString(caption)}" +
@@ -103,10 +88,10 @@ public class InstagramPublisher : ISocialMediaPublisher
         return json.GetProperty("id").GetString()!;
     }
 
-    private async Task<string> CreateImageContainerAsync(string igAccountId, PublishRequest request, CancellationToken ct)
+    private async Task<string> CreateImageContainerAsync(string igUserId, PublishRequest request, CancellationToken ct)
     {
         var caption = BuildCaption(request);
-        var url = $"https://graph.facebook.com/v21.0/{igAccountId}/media" +
+        var url = $"https://graph.instagram.com/v21.0/{igUserId}/media" +
                   $"?image_url={Uri.EscapeDataString(request.MediaUrl ?? "")}" +
                   $"&caption={Uri.EscapeDataString(caption)}" +
                   $"&access_token={request.AccessToken}";
@@ -121,20 +106,46 @@ public class InstagramPublisher : ISocialMediaPublisher
     {
         for (var i = 0; i < 30; i++)
         {
-            var statusUrl = $"https://graph.facebook.com/v21.0/{containerId}?fields=status_code&access_token={accessToken}";
-            var statusResponse = await _http.GetFromJsonAsync<JsonElement>(statusUrl, ct);
+            var statusUrl = $"https://graph.instagram.com/v21.0/{containerId}?fields=status_code,status&access_token={accessToken}";
 
-            if (statusResponse.TryGetProperty("status_code", out var statusCode))
+            var httpResponse = await _http.GetAsync(statusUrl, ct);
+            if (!httpResponse.IsSuccessStatusCode)
             {
-                var status = statusCode.GetString();
-                if (status == "FINISHED") return;
-                if (status == "ERROR") throw new InvalidOperationException("Instagram media container processing failed");
+                var body = await httpResponse.Content.ReadAsStringAsync(ct);
+                throw new InvalidOperationException(
+                    $"Instagram container status check failed ({(int)httpResponse.StatusCode}): {body}");
+            }
+
+            var statusResponse = await httpResponse.Content.ReadFromJsonAsync<JsonElement>(ct);
+
+            var status = statusResponse.TryGetProperty("status_code", out var statusCode)
+                ? statusCode.GetString()
+                : null;
+
+            _logger.LogDebug("Instagram container {ContainerId} status: {Status} (attempt {Attempt}/30)",
+                containerId, status ?? "unknown", i + 1);
+
+            switch (status)
+            {
+                case "FINISHED":
+                    return;
+                case "ERROR":
+                {
+                    var errorDetail = statusResponse.TryGetProperty("status", out var st)
+                        ? st.GetString()
+                        : "unknown";
+                    throw new InvalidOperationException(
+                        $"Instagram media container processing failed. status={errorDetail}");
+                }
+                case "EXPIRED":
+                    throw new InvalidOperationException(
+                        "Instagram media container expired before it could be published.");
             }
 
             await Task.Delay(TimeSpan.FromSeconds(2), ct);
         }
 
-        throw new TimeoutException("Instagram media container did not become ready within timeout");
+        throw new TimeoutException("Instagram media container did not become ready within 60 seconds.");
     }
 
     private static string BuildCaption(PublishRequest request)

@@ -21,10 +21,10 @@ public class YouTubeOAuthProvider : IOAuthProvider
 
     public PlatformType SupportedPlatform => PlatformType.YouTube;
 
-    public string GetAuthorizationUrl(OAuthPlatformConfig config, string state)
+    public OAuthAuthorizationResult GetAuthorizationUrl(OAuthPlatformConfig config, string state)
     {
         var scopes = Uri.EscapeDataString(config.Scopes);
-        return $"https://accounts.google.com/o/oauth2/v2/auth" +
+        var url = $"https://accounts.google.com/o/oauth2/v2/auth" +
                $"?client_id={config.ClientId}" +
                $"&redirect_uri={Uri.EscapeDataString(config.RedirectUri)}" +
                $"&scope={scopes}" +
@@ -32,9 +32,10 @@ public class YouTubeOAuthProvider : IOAuthProvider
                $"&response_type=code" +
                $"&access_type=offline" +
                $"&prompt=consent";
+        return new OAuthAuthorizationResult(url, null);
     }
 
-    public async Task<OAuthTokenResult> ExchangeCodeAsync(OAuthPlatformConfig config, string code, CancellationToken ct = default)
+    public async Task<OAuthTokenResult> ExchangeCodeAsync(OAuthPlatformConfig config, string code, string? codeVerifier, CancellationToken ct = default)
     {
         var payload = new FormUrlEncodedContent(new Dictionary<string, string>
         {

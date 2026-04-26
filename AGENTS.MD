@@ -49,6 +49,17 @@ The system applies audience-aware AI prompts across three primary segments when 
 * **Quality Control:** All AI-generated fragments pass through a human review and approval step before being used in campaigns.
 * **Bias Mitigation:** Audience-specific prompts are reviewed regularly to ensure balanced and fair content extraction across all three target segments.
 
+## 📝 Documentation Maintenance
+**MANDATORY:** Whenever a crucial change is made to the system — including but not limited to: new features, architectural decisions, integration changes, configuration updates, API contract changes, or infrastructure modifications — the relevant documentation file(s) in the `knowledge/` folder **must be updated** in the same session.
+
+* `knowledge/index.md` — System overview and feature index
+* `knowledge/keycloak.md` — Authentication & Keycloak configuration
+* `knowledge/oauth-credentials.md` — OAuth platform credentials and flows
+* `knowledge/ollama.md` — LLM/Ollama integration details
+* `knowledge/social-media-integration.md` — Platform-specific publishing details
+
+If no existing file covers the changed area, create a new `.md` file in `knowledge/` describing it.
+
 ## 📈 Performance Metrics (KPIs)
 * **Pipeline Throughput:** Video processing pipeline completes asynchronously; throughput scales horizontally via Kafka consumer group parallelism.
 * **Fragment Review Cycle:** Time from video upload to approved fragments available for campaigns.

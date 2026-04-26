@@ -1,12 +1,24 @@
+import { SocialIcon } from 'react-social-icons';
 import { useMyPlatforms, useConnectPlatform, useDisconnectPlatform } from '../hooks/usePlatforms';
 import type { OAuthPlatform, PlatformDto } from '../api/types';
 
-const SUPPORTED_PLATFORMS: { name: OAuthPlatform; label: string; color: string; icon: string }[] = [
-  { name: 'Instagram', label: 'Instagram', color: 'bg-gradient-to-r from-purple-500 to-pink-500', icon: '📸' },
-  { name: 'TikTok', label: 'TikTok', color: 'bg-black', icon: '🎵' },
-  { name: 'YouTube', label: 'YouTube Shorts', color: 'bg-red-600', icon: '▶️' },
-  { name: 'X', label: 'X (Twitter)', color: 'bg-gray-900', icon: '𝕏' },
+const SUPPORTED_PLATFORMS: { name: OAuthPlatform; label: string }[] = [
+  { name: 'Instagram', label: 'Instagram' },
+  { name: 'TikTok', label: 'TikTok' },
+  { name: 'YouTube', label: 'YouTube Shorts' },
+  { name: 'X', label: 'X (Twitter)' },
 ];
+
+function platformNetwork(type: string): string {
+  switch (type) {
+    case 'Instagram': return 'instagram';
+    case 'TikTok': return 'tiktok';
+    case 'YouTube': return 'youtube';
+    case 'X': return 'x';
+    case 'LinkedIn': return 'linkedin';
+    default: return 'sharethis';
+  }
+}
 
 function PlatformCard({
   platform,
@@ -30,21 +42,25 @@ function PlatformCard({
   return (
     <div className="border border-gray-200 rounded-lg p-5 flex items-center justify-between">
       <div className="flex items-center gap-4">
-        <div className={`w-12 h-12 ${platform.color} rounded-lg flex items-center justify-center text-white text-xl`}>
-          {platform.icon}
-        </div>
+        <SocialIcon
+          network={platformNetwork(platform.name)}
+          style={{ width: 40, height: 40 }}
+        />
         <div>
           <h3 className="font-medium text-gray-900">{platform.label}</h3>
           {connected ? (
-            <div className="text-sm text-gray-500">
+            <div className="flex flex-col gap-0.5 text-sm mt-0.5">
               <span className="text-green-600 font-medium">Connected</span>
-              {connected.accountName && <span> · {connected.accountName}</span>}
-              {isExpired && <span className="text-red-500 ml-2">(Token expired)</span>}
-              {connected.tokenExpiresAt && !isExpired && (
-                <span className="ml-2">
-                  · Expires {new Date(connected.tokenExpiresAt).toLocaleDateString()}
-                </span>
+              {connected.accountName && (
+                <span className="text-gray-500">@{connected.accountName}</span>
               )}
+              {isExpired ? (
+                <span className="text-red-500">Token expired</span>
+              ) : connected.tokenExpiresAt ? (
+                <span className="text-gray-400">
+                  Expires {new Date(connected.tokenExpiresAt).toLocaleDateString()}
+                </span>
+              ) : null}
             </div>
           ) : (
             <p className="text-sm text-gray-400">Not connected</p>

@@ -10,7 +10,7 @@ import { videosApi } from '../../api/videos';
 import { useCreateCampaign, useUpdateCampaign, useCampaign } from '../../hooks/useCampaigns';
 import { useUploadVideo, useProcessVideo, useVideoUrl } from '../../hooks/useVideos';
 import { useVideoFragments, useUpdateFragment } from '../../hooks/useFragments';
-import { useCreatePost, useCampaignPosts, useScheduledPostsInRange } from '../../hooks/usePosts';
+import { useCreatePost, usePublishPost, useCampaignPosts, useScheduledPostsInRange } from '../../hooks/usePosts';
 import { useMyPlatforms } from '../../hooks/usePlatforms';
 import { useVideoProcessingEvents } from '../../hooks/useVideoProcessingEvents';
 import StepCampaignSetup, { type CampaignSetupData } from './StepCampaignSetup';
@@ -88,6 +88,7 @@ export default function CreateCampaignPage() {
   const { execute: uploadVideo } = useUploadVideo();
   const { execute: processVideo } = useProcessVideo();
   const { execute: createPost } = useCreatePost();
+  const { execute: publishPost } = usePublishPost();
   const { execute: updateFragment } = useUpdateFragment();
 
   // ── Step 2 queries (only when videoId is set) ──────────────────────────
@@ -368,13 +369,14 @@ export default function CreateCampaignPage() {
       try {
         for (const frag of approvedFragments) {
           for (const platformId of platformIds) {
-            await createPost({
+            const createdPost = await createPost({
               fragmentId: frag.id,
               platformId,
               campaignId: campaign.id,
               title: frag.description ?? undefined,
               content: frag.hashtags ?? undefined,
             });
+            await publishPost(createdPost.id);
           }
         }
         // Mark campaign as Active
@@ -392,7 +394,7 @@ export default function CreateCampaignPage() {
         setPublishing(false);
       }
     },
-    [campaign, approvedFragments, createPost, updateCampaign, navigate],
+    [campaign, approvedFragments, createPost, publishPost, updateCampaign, navigate],
   );
 
   const stepVariants = useMemo(() => ({

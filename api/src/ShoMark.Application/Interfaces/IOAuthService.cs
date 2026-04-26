@@ -6,7 +6,7 @@ namespace ShoMark.Application.Interfaces;
 
 public interface IOAuthService
 {
-    string GetAuthorizationUrl(PlatformType platform, string state);
-    Task<OAuthTokenResult> ExchangeCodeAsync(PlatformType platform, string code, CancellationToken ct = default);
+    OAuthAuthorizationResult GetAuthorizationUrl(PlatformType platform, string state);
+    Task<OAuthTokenResult> ExchangeCodeAsync(PlatformType platform, string code, string? codeVerifier, CancellationToken ct = default);
     Task<OAuthTokenResult> RefreshTokenAsync(PlatformType platform, string refreshToken, CancellationToken ct = default);
 }

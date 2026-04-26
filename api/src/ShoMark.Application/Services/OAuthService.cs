@@ -17,18 +17,18 @@ public class OAuthService : IOAuthService
         _providers = providers.ToDictionary(p => p.SupportedPlatform);
     }
 
-    public string GetAuthorizationUrl(PlatformType platform, string state)
+    public OAuthAuthorizationResult GetAuthorizationUrl(PlatformType platform, string state)
     {
         var provider = GetProvider(platform);
         var config = GetPlatformConfig(platform);
         return provider.GetAuthorizationUrl(config, state);
     }
 
-    public async Task<OAuthTokenResult> ExchangeCodeAsync(PlatformType platform, string code, CancellationToken ct = default)
+    public async Task<OAuthTokenResult> ExchangeCodeAsync(PlatformType platform, string code, string? codeVerifier, CancellationToken ct = default)
     {
         var provider = GetProvider(platform);
         var config = GetPlatformConfig(platform);
-        return await provider.ExchangeCodeAsync(config, code, ct);
+        return await provider.ExchangeCodeAsync(config, code, codeVerifier, ct);
     }
 
     public async Task<OAuthTokenResult> RefreshTokenAsync(PlatformType platform, string refreshToken, CancellationToken ct = default)

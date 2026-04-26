@@ -1,9 +1,12 @@
+import { useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from 'primereact/button';
 import { Card } from 'primereact/card';
 import { Tag } from 'primereact/tag';
 import { ProgressSpinner } from 'primereact/progressspinner';
-import { useCampaign } from '../hooks/useCampaigns';
+import { Toast } from 'primereact/toast';
+import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
+import { useCampaign, useDeleteCampaign } from '../hooks/useCampaigns';
 
 function statusSeverity(status: string) {
   switch (status) {
@@ -19,6 +22,25 @@ export default function CampaignDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: campaign, loading, error } = useCampaign(id!);
+  const { execute: deleteCampaign } = useDeleteCampaign();
+  const toast = useRef<Toast>(null);
+
+  function handleDelete() {
+    confirmDialog({
+      message: `Are you sure you want to delete "${campaign?.name ?? 'this campaign'}"?`,
+      header: 'Delete Campaign',
+      icon: 'pi pi-exclamation-triangle',
+      acceptClassName: 'p-button-danger',
+      accept: async () => {
+        try {
+          await deleteCampaign(id!);
+          navigate('/campaigns');
+        } catch {
+          toast.current?.show({ severity: 'error', summary: 'Failed to delete campaign', life: 3000 });
+        }
+      },
+    });
+  }
 
   if (loading) {
     return (
@@ -41,12 +63,23 @@ export default function CampaignDetailsPage() {
 
   return (
     <div>
+      <Toast ref={toast} position="top-right" />
+      <ConfirmDialog />
+
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Button icon="pi pi-arrow-left" text rounded onClick={() => navigate('/campaigns')} />
           <h1 className="text-2xl font-semibold text-gray-900">{campaign.name ?? 'Untitled Campaign'}</h1>
           <Tag value={campaign.status} severity={statusSeverity(campaign.status)} />
         </div>
+        <Button
+          label="Delete"
+          icon="pi pi-trash"
+          severity="danger"
+          outlined
+          size="small"
+          onClick={handleDelete}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

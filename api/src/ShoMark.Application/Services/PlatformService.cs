@@ -39,10 +39,11 @@ public class PlatformService : IPlatformService
             platforms.Select(p => p.ToDto()).ToList());
     }
 
-    public async Task<Result<PlatformDto>> CreateAsync(CreatePlatformRequest request, CancellationToken ct = default)
-    {
-        var userId = _currentUser.UserId;
+    public Task<Result<PlatformDto>> CreateAsync(CreatePlatformRequest request, CancellationToken ct = default)
+        => CreateForUserAsync(_currentUser.UserId, request, ct);
 
+    public async Task<Result<PlatformDto>> CreateForUserAsync(Guid userId, CreatePlatformRequest request, CancellationToken ct = default)
+    {
         var platform = new Platform
         {
             UserId = userId,

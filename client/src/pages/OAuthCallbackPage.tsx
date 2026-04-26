@@ -8,15 +8,22 @@ export default function OAuthCallbackPage() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const error = searchParams.get('error');
+    const statusParam = searchParams.get('status');
+    const platform = searchParams.get('platform');
+    const messageParam = searchParams.get('message');
+    const providerError = searchParams.get('error');
+    const providerErrorDescription = searchParams.get('error_description');
 
-    if (error) {
-      setStatus('error');
-      setMessage(searchParams.get('error_description') ?? error);
-    } else {
-      // The backend handles the token exchange and redirects here on success
+    if (statusParam === 'success') {
       setStatus('success');
-      setMessage('Account connected successfully!');
+      setMessage(platform ? `${platform} connected successfully!` : 'Account connected successfully!');
+    } else if (statusParam === 'error' || providerError) {
+      setStatus('error');
+      setMessage(messageParam ?? providerErrorDescription ?? providerError ?? 'Connection failed');
+    } else {
+      // No structured status (e.g. opened directly) — fall back to a neutral error.
+      setStatus('error');
+      setMessage('Missing OAuth response');
     }
 
     // Redirect to settings after a brief delay
