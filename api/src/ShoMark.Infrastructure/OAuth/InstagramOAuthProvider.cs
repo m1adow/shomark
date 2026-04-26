@@ -8,10 +8,11 @@ using ShoMark.Domain.Enums;
 namespace ShoMark.Infrastructure.OAuth;
 
 /// <summary>
-/// Instagram OAuth via Facebook Graph API (Instagram Business accounts).
-/// Auth endpoint: https://www.facebook.com/v21.0/dialog/oauth
-/// Token endpoint: https://graph.facebook.com/v21.0/oauth/access_token
-/// Long-lived token: https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token
+/// Instagram OAuth via Instagram Login (native Instagram OAuth, not Facebook Graph API).
+/// Auth endpoint:         https://www.instagram.com/oauth/authorize
+/// Token endpoint (POST): https://api.instagram.com/oauth/access_token
+/// Long-lived token:      https://graph.instagram.com/access_token?grant_type=ig_exchange_token
+/// Refresh:               https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token
 /// </summary>
 public class InstagramOAuthProvider : IOAuthProvider
 {
@@ -21,49 +22,54 @@ public class InstagramOAuthProvider : IOAuthProvider
 
     public PlatformType SupportedPlatform => PlatformType.Instagram;
 
-    public string GetAuthorizationUrl(OAuthPlatformConfig config, string state)
+    public OAuthAuthorizationResult GetAuthorizationUrl(OAuthPlatformConfig config, string state)
     {
         var scopes = Uri.EscapeDataString(config.Scopes);
-        return $"https://www.facebook.com/v21.0/dialog/oauth" +
+        var url = $"https://www.instagram.com/oauth/authorize" +
                $"?client_id={config.ClientId}" +
                $"&redirect_uri={Uri.EscapeDataString(config.RedirectUri)}" +
                $"&scope={scopes}" +
                $"&state={state}" +
                $"&response_type=code";
+        return new OAuthAuthorizationResult(url, null);
     }
 
-    public async Task<OAuthTokenResult> ExchangeCodeAsync(OAuthPlatformConfig config, string code, CancellationToken ct = default)
+    public async Task<OAuthTokenResult> ExchangeCodeAsync(OAuthPlatformConfig config, string code, string? codeVerifier, CancellationToken ct = default)
     {
-        // Exchange code for short-lived token
-        var tokenUrl = $"https://graph.facebook.com/v21.0/oauth/access_token" +
-                       $"?client_id={config.ClientId}" +
-                       $"&client_secret={config.ClientSecret}" +
-                       $"&redirect_uri={Uri.EscapeDataString(config.RedirectUri)}" +
-                       $"&code={Uri.EscapeDataString(code)}";
+        // Exchange code for short-lived token (must be a POST with form data)
+        var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["client_id"]     = config.ClientId,
+            ["client_secret"] = config.ClientSecret,
+            ["grant_type"]    = "authorization_code",
+            ["redirect_uri"]  = config.RedirectUri,
+            ["code"]          = code,
+        });
 
-        var tokenResponse = await _http.GetFromJsonAsync<JsonElement>(tokenUrl, ct);
-        var shortLivedToken = tokenResponse.GetProperty("access_token").GetString()!;
+        var tokenResponse = await _http.PostAsync("https://api.instagram.com/oauth/access_token", form, ct);
+        tokenResponse.EnsureSuccessStatusCode();
+        var tokenJson = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+        var shortLivedToken = tokenJson.GetProperty("access_token").GetString()!;
 
-        // Exchange for long-lived token
-        var longLivedUrl = $"https://graph.facebook.com/v21.0/oauth/access_token" +
-                           $"?grant_type=fb_exchange_token" +
+        // Exchange for long-lived token (60-day)
+        var longLivedUrl = $"https://graph.instagram.com/access_token" +
+                           $"?grant_type=ig_exchange_token" +
                            $"&client_id={config.ClientId}" +
                            $"&client_secret={config.ClientSecret}" +
-                           $"&fb_exchange_token={shortLivedToken}";
+                           $"&access_token={shortLivedToken}";
 
-        var longLivedResponse = await _http.GetFromJsonAsync<JsonElement>(longLivedUrl, ct);
-        var accessToken = longLivedResponse.GetProperty("access_token").GetString()!;
-        var expiresIn = longLivedResponse.TryGetProperty("expires_in", out var exp) ? exp.GetInt32() : 5184000;
+        var longLivedJson = await _http.GetFromJsonAsync<JsonElement>(longLivedUrl, ct);
+        var accessToken = longLivedJson.GetProperty("access_token").GetString()!;
+        var expiresIn = longLivedJson.TryGetProperty("expires_in", out var exp) ? exp.GetInt32() : 5184000;
 
-        // Get Instagram Business account info
-        var accountName = await GetAccountNameAsync(accessToken, ct);
+        var accountName = await GetUsernameAsync(accessToken, ct);
 
         return new OAuthTokenResult(accessToken, null, expiresIn, accountName);
     }
 
     public async Task<OAuthTokenResult> RefreshTokenAsync(OAuthPlatformConfig config, string refreshToken, CancellationToken ct = default)
     {
-        // Instagram long-lived tokens are refreshed by exchanging them again
+        // Long-lived tokens are refreshed by passing them again (not a separate refresh_token)
         var url = $"https://graph.instagram.com/refresh_access_token" +
                   $"?grant_type=ig_refresh_token" +
                   $"&access_token={refreshToken}";
@@ -75,28 +81,10 @@ public class InstagramOAuthProvider : IOAuthProvider
         return new OAuthTokenResult(accessToken, null, expiresIn, null);
     }
 
-    private async Task<string?> GetAccountNameAsync(string accessToken, CancellationToken ct)
+    private async Task<string?> GetUsernameAsync(string accessToken, CancellationToken ct)
     {
-        var url = $"https://graph.facebook.com/v21.0/me/accounts?access_token={accessToken}";
+        var url = $"https://graph.instagram.com/me?fields=username&access_token={accessToken}";
         var response = await _http.GetFromJsonAsync<JsonElement>(url, ct);
-
-        if (response.TryGetProperty("data", out var data) && data.GetArrayLength() > 0)
-        {
-            var pageId = data[0].GetProperty("id").GetString()!;
-            var pageToken = data[0].GetProperty("access_token").GetString()!;
-
-            var igUrl = $"https://graph.facebook.com/v21.0/{pageId}?fields=instagram_business_account&access_token={pageToken}";
-            var igResponse = await _http.GetFromJsonAsync<JsonElement>(igUrl, ct);
-
-            if (igResponse.TryGetProperty("instagram_business_account", out var igAccount))
-            {
-                var igId = igAccount.GetProperty("id").GetString()!;
-                var nameUrl = $"https://graph.facebook.com/v21.0/{igId}?fields=username&access_token={pageToken}";
-                var nameResponse = await _http.GetFromJsonAsync<JsonElement>(nameUrl, ct);
-                return nameResponse.TryGetProperty("username", out var username) ? username.GetString() : null;
-            }
-        }
-
-        return null;
+        return response.TryGetProperty("username", out var username) ? username.GetString() : null;
     }
 }

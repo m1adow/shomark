@@ -38,6 +38,7 @@ celerybeat-schedule
 # ===========================
 # .NET / ASP.NET Core
 # ===========================
+appsettings.Development.json
 bin/
 obj/
 *.user

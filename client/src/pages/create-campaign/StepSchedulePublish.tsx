@@ -65,6 +65,19 @@ export default function StepSchedulePublish({
   const canSchedule = selectedPlatformIds.length > 0 && combinedDateTime !== null && !publishing;
   const canPublish = selectedPlatformIds.length > 0 && !publishing;
 
+  // Build draft preview rows for the Upcoming list (one per selected platform)
+  const draftRows = useMemo(() => {
+    if (!scheduledDate || selectedPlatformIds.length === 0) return [];
+    return selectedPlatformIds.map((pid) => ({
+      id: `draft-${pid}`,
+      platformId: pid,
+      title: 'This post (draft)',
+      status: 'Draft',
+      scheduledAt: combinedDateTime?.toISOString() ?? scheduledDate.toISOString(),
+      isDraft: true,
+    }));
+  }, [scheduledDate, combinedDateTime, selectedPlatformIds]);
+
   // Build a map: dateString -> { platformIds, isPreDraft }
   const scheduledDatePlatformMap = useMemo(() => {
     const map = new Map<string, { platformIds: Set<string>; isPreDraft: boolean }>();
@@ -231,11 +244,11 @@ export default function StepSchedulePublish({
         <div className="lg:col-span-2 flex flex-col">
           <Card className="shadow-sm flex-1 schedule-card">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Scheduled Posts</h3>
+            <div className="pointer-events-none">
             <Calendar
               value={scheduledDate}
-              onChange={(e) => setScheduledDate(e.value as Date | null)}
+              onChange={() => {}}
               inline
-              selectionMode="single"
               minDate={new Date()}
               className="w-full schedule-calendar"
               dateTemplate={(date) => {
@@ -265,50 +278,68 @@ export default function StepSchedulePublish({
                 );
               }}
             />
+            </div>
           </Card>
 
-          {/* Upcoming scheduled posts list */}
-          {scheduledPosts.length > 0 && (
+          {/* Upcoming scheduled posts list — always shown when there are draft or real scheduled posts */}
+          {(draftRows.length > 0 || scheduledPosts.some((p) => p.scheduledAt)) && ((() => {
+            type UpcomingRow = {
+              id: string;
+              platformId: string;
+              title: string | null | undefined;
+              status: string;
+              scheduledAt: string;
+              isDraft: boolean;
+            };
+            const realRows: UpcomingRow[] = scheduledPosts
+              .filter((p): p is typeof p & { scheduledAt: string } => !!p.scheduledAt)
+              .map((p) => ({ ...p, isDraft: false, status: p.status ?? '' }));
+            const merged = [...realRows, ...draftRows]
+              .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+              .slice(0, 12);
+            return (
             <Card className="shadow-sm mt-4">
               <h4 className="text-sm font-medium text-gray-700 mb-3">Upcoming</h4>
               <div className="space-y-2">
-                {scheduledPosts
-                  .filter((p) => p.scheduledAt)
-                  .sort(
-                    (a, b) =>
-                      new Date(a.scheduledAt!).getTime() - new Date(b.scheduledAt!).getTime(),
-                  )
-                  .slice(0, 10)
-                  .map((p) => {
-                    const platform = platforms.find((pl) => pl.id === p.platformId);
-                    return (
-                      <div
-                        key={p.id}
-                        className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          {platform && (
-                            <SocialIcon
-                              network={platformNetwork(platform.platformType)}
-                              style={{ width: 20, height: 20 }}
-                            />
-                          )}
-                          <span className="text-sm text-gray-700 truncate">
-                            {p.title ?? 'Untitled'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <Tag value={p.status} severity="info" className="text-xs" />
-                          <span className="text-xs text-gray-500">
-                            {new Date(p.scheduledAt!).toLocaleString()}
-                          </span>
-                        </div>
+                {merged.map((p) => {
+                  const platform = platforms.find((pl) => pl.id === p.platformId);
+                  return (
+                    <div
+                      key={p.id}
+                      className={`flex items-center justify-between p-2 rounded-lg border-l-4 ${
+                        p.isDraft
+                          ? 'bg-amber-50 border-amber-400 border border-dashed'
+                          : 'bg-gray-50 border-blue-400'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {platform && (
+                          <SocialIcon
+                            network={platformNetwork(platform.platformType)}
+                            style={{ width: 20, height: 20 }}
+                          />
+                        )}
+                        <span className={`text-sm truncate ${p.isDraft ? 'text-amber-800 italic' : 'text-gray-700'}`}>
+                          {p.title ?? 'Untitled'}
+                        </span>
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Tag
+                          value={p.status}
+                          severity={p.isDraft ? 'warning' : 'info'}
+                          className="text-xs"
+                        />
+                        <span className="text-xs text-gray-500">
+                          {new Date(p.scheduledAt).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </Card>
-          )}
+          );
+          })())}
         </div>
       </div>
     </div>

@@ -34,23 +34,66 @@ Instagram content publishing uses the **Facebook Graph API** through a Meta App.
 4. Enter an **App name** (e.g., `ShoMark`) and a **contact email** → **Next**.
 5. Select the **Other** use case → **Next**.
 6. Select **Business** as the app type → **Create App**.
-7. You will land on the **App Dashboard** with a list of available **Use Cases**.
-8. Find **Facebook Login for Business** and click **Customize**:
-   - Under **Settings**, enable **Client OAuth Login** and **Web OAuth Login**.
-   - Add the redirect URI: `http://localhost:5145/api/oauth/Instagram/callback`
-   - Click **Save Changes**.
-9. Go back to the dashboard and find the **Instagram** use case section:
-   - Click **Customize** → **Add** the following permissions:
-     - `instagram_basic`
-     - `instagram_content_publish`
-     - `pages_show_list`
-     - `pages_read_engagement`
-   - Each permission shows its review status. In **Development Mode**, test users can use them without review.
-10. Go to **App settings** → **Basic**:
-    - Copy the **App ID** — this is your `ClientId`.
-    - Copy the **App Secret** (click **Show**) — this is your `ClientSecret`.
+7. You will land on the **App Dashboard**.
 
-> **Note:** In **Development Mode** you can test with users who have a role on the app (Admin, Developer, Tester) without going through App Review. Add test users under **App Roles** → **Roles**.
+**Add Facebook Login for Business:**
+
+8. In the **left sidebar**, click the **`+` (Add Products)** button (or scroll to "Add products to your app" on the dashboard).
+9. Find **Facebook Login for Business** → click **Set up**.
+10. In the left sidebar, go to **Facebook Login for Business** → **Settings**:
+    - Enable **Client OAuth Login** and **Web OAuth Login**.
+    - Add the redirect URI: `http://localhost:5145/api/oauth/Instagram/callback`
+    - Click **Save Changes**.
+
+**Add Instagram Graph API and permissions:**
+
+11. In the **left sidebar**, click **`+` (Add Products)** again.
+12. Find **Instagram Graph API** → click **Set up**. It will appear in the left sidebar.
+13. To add permissions, go to **App Review** → **Permissions and Features** in the left sidebar.
+14. Search for and click **Request** (or **Add**) on each of the following:
+    - `instagram_basic`
+    - `instagram_content_publish`
+    - `pages_show_list`
+    - `pages_read_engagement`
+
+> **Development Mode:** You do **not** need to submit for App Review. In Development Mode, these permissions are automatically available to users with a role on the app. Add test users under **App Roles** → **Roles**.
+
+15. Go to **App Settings** → **Basic** in the left sidebar:
+    - Copy the **App ID** — this is your `ClientId`.
+    - Click **Show** next to **App Secret** — this is your `ClientSecret`.
+
+---
+
+### API Setup with Instagram Business Login (Current UI)
+
+Once the Instagram Graph API product is added, Meta shows an **"API setup with Instagram business login"** page with 4 sections:
+
+**Credentials (top of page):**
+- **Instagram app name** — your app name (e.g., `ShoMark-IG`)
+- **Instagram app ID** — shown here for reference, but **do NOT use this as `ClientId`**
+- **Instagram app secret** — shown here for reference, but **do NOT use this as `ClientSecret`**
+
+> ⚠️ **Use the Facebook App ID / Secret, not the Instagram App ID / Secret.**
+> The `https://www.facebook.com/v21.0/dialog/oauth` endpoint validates the **Facebook App ID**
+> (found under **App Settings → Basic**). The "Instagram app ID" shown on the product page
+> is a different identifier and will trigger "Invalid App ID".
+
+The correct values come from **App Settings → Basic**:
+- **App ID** (top of page) → `ClientId`
+- **App Secret** → click **Show** → `ClientSecret`
+
+**Section 1 — Generate access tokens:**
+- Click **Add account** to link an Instagram test account.
+- Before this, make sure the Instagram account has the **Instagram Tester** role assigned under **App Roles** → **Roles**.
+
+**Section 2 — Configure webhooks:** Skip — not required for ShoMark.
+
+**Section 3 — Set up Instagram business login:**
+- Click **Set up** to open the OAuth / redirect URI configuration.
+- Add the redirect URI: `http://localhost:5145/api/oauth/Instagram/callback`
+- Configure the required permissions: `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`
+
+**Section 4 — Complete app review:** Only required for Live mode. In **Development Mode**, skip this step — permissions work for test users without review.
 
 ### Configuration
 
@@ -81,7 +124,7 @@ Uses the **TikTok Login Kit** and **Content Posting API**.
    - **Login Kit** — for OAuth
    - **Content Posting API** — for publishing videos
 5. In **Login Kit** settings:
-   - Set the **Redirect URI** to: `http://localhost:5145/api/oauth/TikTok/callback`
+   - Set the **Redirect URI** — see note below about localhost.
    - Add the required scopes: `user.info.basic`, `video.publish`, `video.upload`
 6. Submit the app for review (or use **Sandbox mode** for testing).
 7. After approval, go to **Manage apps** → select your app:
@@ -90,13 +133,34 @@ Uses the **TikTok Login Kit** and **Content Posting API**.
 
 > **Sandbox mode** allows testing with up to 20 registered test users without full approval.
 
+### ⚠️ Localhost Not Supported — Use ngrok for Local Testing
+
+TikTok **does not accept `localhost`** as a redirect URI. To test locally, use **ngrok** to expose your local API via a public HTTPS URL:
+
+1. Install ngrok:
+   ```
+   winget install ngrok
+   ```
+2. Start a tunnel on the API port:
+   ```
+   ngrok http 5145
+   ```
+3. Copy the generated URL (e.g., `https://xxxx-xxxx.ngrok-free.app`).
+4. In the TikTok Developer Portal → your app → **Login Kit** settings, enter:
+   ```
+   https://xxxx-xxxx.ngrok-free.app/api/oauth/TikTok/callback
+   ```
+5. Update `appsettings.Development.json` with the same ngrok URL (see Configuration below).
+
+> The ngrok URL **changes every session** on the free tier — you'll need to update both the TikTok portal and your config each time you restart ngrok. A paid ngrok plan provides a static domain.
+
 ### Configuration
 
 ```json
 "TikTok": {
   "ClientId": "<Client Key>",
   "ClientSecret": "<Client Secret>",
-  "RedirectUri": "http://localhost:5145/api/oauth/TikTok/callback",
+  "RedirectUri": "https://<your-ngrok-subdomain>.ngrok-free.app/api/oauth/TikTok/callback",
   "Scopes": "user.info.basic,video.publish,video.upload"
 }
 ```

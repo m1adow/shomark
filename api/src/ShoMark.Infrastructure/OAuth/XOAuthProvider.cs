@@ -19,22 +19,17 @@ public class XOAuthProvider : IOAuthProvider
 {
     private readonly HttpClient _http;
 
-    // In production, store per-user code_verifier in server-side cache alongside state.
-    // For simplicity, the OAuthController manages the code_verifier via IMemoryCache.
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _codeVerifiers = new();
-
     public XOAuthProvider(HttpClient http) => _http = http;
 
     public PlatformType SupportedPlatform => PlatformType.X;
 
-    public string GetAuthorizationUrl(OAuthPlatformConfig config, string state)
+    public OAuthAuthorizationResult GetAuthorizationUrl(OAuthPlatformConfig config, string state)
     {
         var codeVerifier = GenerateCodeVerifier();
         var codeChallenge = GenerateCodeChallenge(codeVerifier);
-        _codeVerifiers[state] = codeVerifier;
 
         var scopes = Uri.EscapeDataString(config.Scopes);
-        return $"https://twitter.com/i/oauth2/authorize" +
+        var url = $"https://twitter.com/i/oauth2/authorize" +
                $"?client_id={config.ClientId}" +
                $"&redirect_uri={Uri.EscapeDataString(config.RedirectUri)}" +
                $"&scope={scopes}" +
@@ -42,29 +37,18 @@ public class XOAuthProvider : IOAuthProvider
                $"&response_type=code" +
                $"&code_challenge={codeChallenge}" +
                $"&code_challenge_method=S256";
+        return new OAuthAuthorizationResult(url, codeVerifier);
     }
 
-    public async Task<OAuthTokenResult> ExchangeCodeAsync(OAuthPlatformConfig config, string code, CancellationToken ct = default)
+    public async Task<OAuthTokenResult> ExchangeCodeAsync(OAuthPlatformConfig config, string code, string? codeVerifier, CancellationToken ct = default)
     {
-        // Retrieve code_verifier from earlier authorization request
-        // Using state embedded in the code exchange flow — the controller passes it via the code parameter context
-        var codeVerifier = _codeVerifiers.Values.FirstOrDefault() ?? "placeholder";
-
-        // Try to find and remove the matching code_verifier
-        foreach (var kvp in _codeVerifiers)
-        {
-            codeVerifier = kvp.Value;
-            _codeVerifiers.TryRemove(kvp.Key, out _);
-            break;
-        }
-
         var payload = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["client_id"] = config.ClientId,
             ["code"] = code,
             ["grant_type"] = "authorization_code",
             ["redirect_uri"] = config.RedirectUri,
-            ["code_verifier"] = codeVerifier
+            ["code_verifier"] = codeVerifier ?? string.Empty
         });
 
         var request = new HttpRequestMessage(HttpMethod.Post, "https://api.x.com/2/oauth2/token")
