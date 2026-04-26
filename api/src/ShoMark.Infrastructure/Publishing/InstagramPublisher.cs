@@ -106,20 +106,46 @@ public class InstagramPublisher : ISocialMediaPublisher
     {
         for (var i = 0; i < 30; i++)
         {
-            var statusUrl = $"https://graph.instagram.com/v21.0/{containerId}?fields=status_code&access_token={accessToken}";
-            var statusResponse = await _http.GetFromJsonAsync<JsonElement>(statusUrl, ct);
+            var statusUrl = $"https://graph.instagram.com/v21.0/{containerId}?fields=status_code,status&access_token={accessToken}";
 
-            if (statusResponse.TryGetProperty("status_code", out var statusCode))
+            var httpResponse = await _http.GetAsync(statusUrl, ct);
+            if (!httpResponse.IsSuccessStatusCode)
             {
-                var status = statusCode.GetString();
-                if (status == "FINISHED") return;
-                if (status == "ERROR") throw new InvalidOperationException("Instagram media container processing failed");
+                var body = await httpResponse.Content.ReadAsStringAsync(ct);
+                throw new InvalidOperationException(
+                    $"Instagram container status check failed ({(int)httpResponse.StatusCode}): {body}");
+            }
+
+            var statusResponse = await httpResponse.Content.ReadFromJsonAsync<JsonElement>(ct);
+
+            var status = statusResponse.TryGetProperty("status_code", out var statusCode)
+                ? statusCode.GetString()
+                : null;
+
+            _logger.LogDebug("Instagram container {ContainerId} status: {Status} (attempt {Attempt}/30)",
+                containerId, status ?? "unknown", i + 1);
+
+            switch (status)
+            {
+                case "FINISHED":
+                    return;
+                case "ERROR":
+                {
+                    var errorDetail = statusResponse.TryGetProperty("status", out var st)
+                        ? st.GetString()
+                        : "unknown";
+                    throw new InvalidOperationException(
+                        $"Instagram media container processing failed. status={errorDetail}");
+                }
+                case "EXPIRED":
+                    throw new InvalidOperationException(
+                        "Instagram media container expired before it could be published.");
             }
 
             await Task.Delay(TimeSpan.FromSeconds(2), ct);
         }
 
-        throw new TimeoutException("Instagram media container did not become ready within timeout");
+        throw new TimeoutException("Instagram media container did not become ready within 60 seconds.");
     }
 
     private static string BuildCaption(PublishRequest request)

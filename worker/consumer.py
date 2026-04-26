@@ -49,21 +49,11 @@ class VideoConsumer:
 
         done_queue: queue.SimpleQueue = queue.SimpleQueue()
         active = 0
+        paused = False
 
         try:
             with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
                 while True:
-                    # Only poll for new work when a worker slot is free.
-                    if active < self._max_workers:
-                        msg = self._consumer.poll(timeout=1.0)
-                        if msg is not None:
-                            if msg.error():
-                                if msg.error().code() != KafkaError._PARTITION_EOF:
-                                    logger.error("Kafka error: %s", msg.error())
-                            else:
-                                active += 1
-                                pool.submit(self._process_task, msg, done_queue)
-
                     # Drain all completed results (non-blocking).
                     while True:
                         try:
@@ -77,6 +67,30 @@ class VideoConsumer:
                         else:
                             # Do not commit — Kafka will redeliver the message.
                             logger.warning("Message NOT committed; will be redelivered")
+
+                    # Resume consumption when a worker slot has freed up.
+                    if paused and active < self._max_workers:
+                        self._consumer.resume(self._consumer.assignment())
+                        paused = False
+
+                    # Always poll to maintain the Kafka heartbeat, even when at capacity.
+                    msg = self._consumer.poll(timeout=1.0)
+
+                    if msg is None:
+                        continue
+                    if msg.error():
+                        if msg.error().code() != KafkaError._PARTITION_EOF:
+                            logger.error("Kafka error: %s", msg.error())
+                        continue
+
+                    active += 1
+                    pool.submit(self._process_task, msg, done_queue)
+
+                    # Pause partition when at capacity — poll() still runs for heartbeat,
+                    # but Kafka won't deliver new messages until we resume.
+                    if active >= self._max_workers:
+                        self._consumer.pause(self._consumer.assignment())
+                        paused = True
 
         except KeyboardInterrupt:
             logger.info("Shutting down consumer…")
