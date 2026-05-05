@@ -1,4 +1,4 @@
-faster-whisper
+faster-whisper>=1.0.0
 requests
 confluent-kafka
 minio

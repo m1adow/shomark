@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from config import Config
@@ -120,10 +121,11 @@ class HighlightFinder:
         description: str | None,
     ) -> list[dict]:
         """Find candidate highlights in one transcript chunk."""
+        t0 = time.perf_counter()
         logger.info("MAP: Processing chunk %d (%d segments)", chunk_id, len(chunk))
         prompt = self._build_map_prompt(chunk, target_audience, description)
         candidates = self._llm.generate_json_array(prompt)
-        logger.info("MAP chunk %d: found %d candidates", chunk_id, len(candidates))
+        logger.info("MAP chunk %d: found %d candidates (%.1fs)", chunk_id, len(candidates), time.perf_counter() - t0)
         return candidates
 
     # --- Reduce Phase ---
@@ -168,21 +170,37 @@ class HighlightFinder:
         description: str | None,
     ) -> list[dict]:
         """Select top N highlights from all candidates."""
+        t0 = time.perf_counter()
         logger.info("REDUCE: Selecting top %d from %d candidates", self._top_highlights, len(candidates))
-        prompt = self._build_reduce_prompt(candidates, target_audience, description)
+
+        # Trim reason text in candidates to reduce input tokens for the reduce call.
+        trimmed = [
+            {**c, "reason": (c.get("reason") or "")[:150]}
+            for c in candidates
+        ]
+
+        prompt = self._build_reduce_prompt(trimmed, target_audience, description)
         result = self._llm.generate_json_array(prompt)
         if not result:
             logger.warning("REDUCE returned empty; falling back to first %d candidates", self._top_highlights)
             return candidates[: self._top_highlights]
+        logger.info("REDUCE complete: %d highlights selected (%.1fs)", len(result), time.perf_counter() - t0)
         return result
 
     # --- Public API ---
 
     @staticmethod
-    def _compact_segments(segments: list[dict], max_gap: float = 2.0) -> list[dict]:
+    def _compact_segments(
+        segments: list[dict],
+        max_gap: float = 2.0,
+        max_block_chars: int = 300,
+        max_blocks: int = 60,
+    ) -> list[dict]:
         """Merge adjacent segments into paragraph blocks to reduce LLM token count.
 
         Segments with a gap <= max_gap seconds are joined into a single entry.
+        Each block's text is capped at max_block_chars characters, and the total
+        number of blocks is capped at max_blocks (evenly subsampled if exceeded).
         Returns: [{"s": start, "e": end, "t": "merged text"}, ...]
         """
         if not segments:
@@ -197,12 +215,20 @@ class HighlightFinder:
                 cur_end = seg["end"]
                 cur_texts.append(seg["text"].strip())
             else:
-                blocks.append({"s": round(cur_start, 1), "e": round(cur_end, 1), "t": " ".join(cur_texts)})
+                text = " ".join(cur_texts)
+                blocks.append({"s": round(cur_start, 1), "e": round(cur_end, 1), "t": text[:max_block_chars]})
                 cur_start = seg["start"]
                 cur_end = seg["end"]
                 cur_texts = [seg["text"].strip()]
 
-        blocks.append({"s": round(cur_start, 1), "e": round(cur_end, 1), "t": " ".join(cur_texts)})
+        text = " ".join(cur_texts)
+        blocks.append({"s": round(cur_start, 1), "e": round(cur_end, 1), "t": text[:max_block_chars]})
+
+        # Subsample evenly when over budget to keep prompt size predictable.
+        if len(blocks) > max_blocks:
+            step = len(blocks) / max_blocks
+            blocks = [blocks[int(i * step)] for i in range(max_blocks)]
+
         return blocks
 
     def find_highlights(
@@ -212,6 +238,7 @@ class HighlightFinder:
         description: str | None = None,
     ) -> list[dict]:
         """Run full map-reduce pipeline: split segments, map in parallel, reduce."""
+        t_total = time.perf_counter()
         logger.info(
             "Starting highlight detection — audience: %s, description: %s",
             target_audience or _DEFAULT_AUDIENCE,
@@ -220,6 +247,7 @@ class HighlightFinder:
         chunks = self._split_segments(segments, self._map_chunks)
 
         all_candidates: list[dict] = []
+        t_map = time.perf_counter()
         with ThreadPoolExecutor(max_workers=len(chunks)) as pool:
             futures = {
                 pool.submit(self.map_highlights, chunk, i + 1, target_audience, description): i
@@ -230,12 +258,21 @@ class HighlightFinder:
                     all_candidates.extend(future.result())
                 except Exception:
                     logger.exception("MAP chunk %d failed", futures[future])
+        logger.info("MAP phase complete: %d candidates in %.1fs", len(all_candidates), time.perf_counter() - t_map)
 
         if not all_candidates:
             logger.warning("No candidates found in any chunk")
             return []
 
-        return self.reduce_highlights(all_candidates, target_audience, description)
+        t_reduce = time.perf_counter()
+        result = self.reduce_highlights(all_candidates, target_audience, description)
+        logger.info(
+            "Highlight detection done — map=%.1fs | reduce=%.1fs | total=%.1fs",
+            t_reduce - t_map,
+            time.perf_counter() - t_reduce,
+            time.perf_counter() - t_total,
+        )
+        return result
 
     @staticmethod
     def _split_segments(segments: list[dict], num_chunks: int) -> list[list[dict]]:

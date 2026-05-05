@@ -17,6 +17,15 @@ Developer documentation for the ShoMark video highlight extraction and campaign 
 | [[keycloak]] | Set up the Keycloak realm, client, and test users for JWT authentication |
 | [[ollama]] | Run the local Ollama LLM server and manage models for highlight detection |
 
+## Worker Performance
+
+| Feature | Details |
+|---------|----------|
+| **Transcript cache** | After Whisper transcription, segments are cached in MinIO bucket `cache` under `transcripts/{sha256}.json`. Cache key = SHA-256(file content + Whisper settings). Subsequent reprocessing of the same video skips Whisper entirely. Controlled by `CACHE_BUCKET` and `CACHE_ENABLED` env vars. |
+| **Batched Whisper** | faster-whisper `BatchedInferencePipeline` is used when `WHISPER_BATCH_SIZE > 0` (default 16). Requires faster-whisper ≥ 1.0.0. Significantly faster on GPU for long videos. |
+| **LLM optimizations** | HTTP session reuse, `OLLAMA_TIMEOUT`, `OLLAMA_NUM_PREDICT` cap, `format:"json"` on every request, and transcript block compaction (max 60 blocks × 300 chars each per map chunk). |
+| **Benchmark script** | `worker/benchmark.py` — run against a local video file to measure cold vs warm pipeline timing. See worker README for usage. |
+
 ## Integrations
 
 | Note | Description |

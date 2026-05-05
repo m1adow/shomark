@@ -22,9 +22,15 @@ services:
       # Ollama
       - OLLAMA_URL=http://ollama:11434/api/generate
       - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - OLLAMA_TIMEOUT=300
+      - OLLAMA_NUM_PREDICT=1024
       # Whisper GPU
       - WHISPER_DEVICE=cuda
       - WHISPER_COMPUTE_TYPE=float16
+      - WHISPER_BATCH_SIZE=16
+      # Transcript cache (MinIO)
+      - CACHE_BUCKET=cache
+      - CACHE_ENABLED=true
     volumes:
       # Map the current directory on your host to /app in the container
       - ../../../worker:/app
