@@ -36,6 +36,7 @@ def main() -> None:
         transcriber=transcriber,
         highlight_finder=highlight_finder,
         video_processor=video_processor,
+        config=config,
     )
 
     # Producer (completion events)

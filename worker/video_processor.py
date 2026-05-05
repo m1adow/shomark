@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
@@ -22,28 +23,20 @@ class VideoProcessor:
         effective_dir = output_dir or self._output_dir
         os.makedirs(effective_dir, exist_ok=True)
         duration = self._get_duration(video_path)
-        results: list[dict] = []
 
-        for i, clip_info in enumerate(highlights):
+        def _process_clip(i: int, clip_info: dict) -> dict | None:
             start = clip_info["start"]
             end = min(clip_info["end"], duration)
-
             if end - start < 10:
                 logger.warning("Skipping clip %d: too short (%.1fs)", i + 1, end - start)
-                continue
-
+                return None
             output_path = os.path.join(effective_dir, f"highlight_{i + 1}.mp4")
             preview_path = os.path.join(effective_dir, f"highlight_{i + 1}_preview.jpg")
             logger.info("Cutting clip %d: %.1fs -> %.1fs", i + 1, start, end)
-
-            # 1. Cut and encode to 9:16 vertical format for Reels/TikTok/Shorts
             self._cut_vertical(video_path, start, end, output_path)
-
-            # 2. Extract preview frame at 25% into the clip
             preview_time = start + (end - start) * 0.25
             self._extract_frame(video_path, preview_time, preview_path)
-
-            results.append({
+            return {
                 "path": output_path,
                 "preview_path": preview_path,
                 "title": clip_info.get("title", ""),
@@ -52,8 +45,17 @@ class VideoProcessor:
                 "hashtags": clip_info.get("hashtags"),
                 "start": start,
                 "end": end,
-            })
+            }
 
+        results: list[dict] = []
+        with ThreadPoolExecutor(max_workers=len(highlights) or 1) as pool:
+            futures = {pool.submit(_process_clip, i, clip): i for i, clip in enumerate(highlights)}
+            for future in as_completed(futures):
+                result = future.result()
+                if result is not None:
+                    results.append(result)
+
+        results.sort(key=lambda r: r["start"])
         logger.info("Cut %d highlight clips", len(results))
         return results
 

@@ -20,7 +20,7 @@ class Config:
 
     # Ollama
     ollama_url: str = os.getenv("OLLAMA_URL", "http://ollama:11434/api/generate")
-    ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen3.5:9b")
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
 
     # Processing
     clip_duration: int = int(os.getenv("CLIP_DURATION", "60"))
@@ -31,3 +31,14 @@ class Config:
     map_chunks: int = int(os.getenv("MAP_CHUNKS", "3"))
     top_highlights: int = int(os.getenv("TOP_HIGHLIGHTS", "3"))
     worker_concurrency: int = int(os.getenv("WORKER_CONCURRENCY", "2"))
+
+    # Transcript cache (MinIO)
+    cache_bucket: str = os.getenv("CACHE_BUCKET", "cache")
+    cache_enabled: bool = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+
+    # Ollama performance
+    ollama_timeout: int = int(os.getenv("OLLAMA_TIMEOUT", "300"))
+    ollama_num_predict: int = int(os.getenv("OLLAMA_NUM_PREDICT", "1024"))
+
+    # Whisper batched inference (0 = disabled, use standard transcribe)
+    whisper_batch_size: int = int(os.getenv("WHISPER_BATCH_SIZE", "16"))
