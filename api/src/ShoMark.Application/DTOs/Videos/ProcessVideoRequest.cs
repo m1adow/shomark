@@ -9,4 +9,5 @@ public record ProcessVideoRequest(
     string? OutputBucket,
     string? OutputPrefix,
     TargetAudience? TargetAudience,
-    string? Description);
+    string? Description,
+    string? AdditionalInstructions);

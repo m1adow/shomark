@@ -7,12 +7,18 @@ import { Tag } from 'primereact/tag';
 import { Message } from 'primereact/message';
 import { SocialIcon } from 'react-social-icons';
 import type { AiFragmentDto, PlatformDto, PostDto } from '../../api/types';
+import FragmentClipPreviewDialog from '../../components/FragmentClipPreviewDialog';
 import { useFragmentThumbnailUrl } from '../../hooks/useFragments';
 
-function FragmentThumb({ fragmentId }: { fragmentId: string }) {
+function FragmentThumb({ fragmentId, onPreview }: { fragmentId: string; onPreview: (id: string) => void }) {
   const { data } = useFragmentThumbnailUrl(fragmentId);
   return (
-    <div className="w-full aspect-video rounded-lg overflow-hidden bg-gray-200">
+    <button
+      type="button"
+      aria-label="Preview generated clip"
+      className="group relative w-full aspect-video overflow-hidden rounded-lg bg-gray-200 text-left"
+      onClick={() => onPreview(fragmentId)}
+    >
       {data?.url ? (
         <img src={data.url} alt="" className="w-full h-full object-cover" loading="lazy" />
       ) : (
@@ -20,7 +26,12 @@ function FragmentThumb({ fragmentId }: { fragmentId: string }) {
           <i className="pi pi-image text-gray-400 text-2xl" />
         </div>
       )}
-    </div>
+      <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/35 group-focus-visible:bg-black/35">
+        <span className="flex h-12 w-12 scale-90 items-center justify-center rounded-full bg-white/90 text-blue-600 opacity-0 shadow-lg transition-all group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100">
+          <i className="pi pi-play text-lg ml-0.5" />
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -52,6 +63,7 @@ export default function StepSchedulePublish({
   const [selectedPlatformIds, setSelectedPlatformIds] = useState<string[]>([]);
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
   const [scheduledTime, setScheduledTime] = useState<Date | null>(null);
+  const [previewFragmentId, setPreviewFragmentId] = useState<string | null>(null);
 
   const combinedDateTime = useMemo(() => {
     if (!scheduledDate) return null;
@@ -134,7 +146,7 @@ export default function StepSchedulePublish({
         <div>
           <Card className="shadow-sm">
             {/* Thumbnail */}
-            {fragment && <FragmentThumb fragmentId={fragment.id} />}
+            {fragment && <FragmentThumb fragmentId={fragment.id} onPreview={setPreviewFragmentId} />}
 
             {/* Description */}
             {fragment && (
@@ -342,6 +354,12 @@ export default function StepSchedulePublish({
           })())}
         </div>
       </div>
+
+      <FragmentClipPreviewDialog
+        fragmentId={previewFragmentId}
+        visible={previewFragmentId !== null}
+        onHide={() => setPreviewFragmentId(null)}
+      />
     </div>
   );
 }

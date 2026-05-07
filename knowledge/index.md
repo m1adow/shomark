@@ -26,6 +26,12 @@ Developer documentation for the ShoMark video highlight extraction and campaign 
 | **LLM optimizations** | HTTP session reuse, `OLLAMA_TIMEOUT`, `OLLAMA_NUM_PREDICT` cap, `format:"json"` on every request, and transcript block compaction (max 60 blocks × 300 chars each per map chunk). |
 | **Benchmark script** | `worker/benchmark.py` — run against a local video file to measure cold vs warm pipeline timing. See worker README for usage. |
 
+## Client Preview
+
+| Feature | Details |
+|---------|----------|
+| **Generated clip preview** | React clip thumbnails in campaign creation open a modal video preview on click. The client lazily calls `GET /api/fragments/{id}/clip-url`, which returns a presigned MinIO URL for the fragment `StorageKey`. Thumbnail images continue to use `GET /api/fragments/{id}/thumbnail-url`. |
+
 ## Integrations
 
 | Note | Description |

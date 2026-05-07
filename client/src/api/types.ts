@@ -287,6 +287,7 @@ export interface ProcessVideoRequest {
   outputPrefix?: string;
   targetAudience?: TargetAudience;
   description?: string;
+  additionalInstructions?: string;
 }
 
 // ── Notifications ────────────────────────────────────────────────────────────

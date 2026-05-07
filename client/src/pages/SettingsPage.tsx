@@ -1,4 +1,5 @@
 import { SocialIcon } from 'react-social-icons';
+import { Tooltip } from 'primereact/tooltip';
 import { useMyPlatforms, useConnectPlatform, useDisconnectPlatform } from '../hooks/usePlatforms';
 import type { OAuthPlatform, PlatformDto } from '../api/types';
 
@@ -39,6 +40,10 @@ function PlatformCard({
     ? new Date(connected.tokenExpiresAt) < new Date()
     : false;
 
+  const tooltipTargetId = `token-info-${platform.name}`;
+  const RENEWAL_MSG =
+    'ShoMark automatically renews this token before publishing when the platform provides a refresh token. If renewal is unavailable, disconnect and reconnect the account to restore access.';
+
   return (
     <div className="border border-gray-200 rounded-lg p-5 flex items-center justify-between">
       <div className="flex items-center gap-4">
@@ -55,10 +60,32 @@ function PlatformCard({
                 <span className="text-gray-500">@{connected.accountName}</span>
               )}
               {isExpired ? (
-                <span className="text-red-500">Token expired</span>
+                <span className="flex items-center gap-1">
+                  <span className="text-red-500">Token expired</span>
+                  <button
+                    id={tooltipTargetId}
+                    type="button"
+                    aria-label="About automatic token renewal"
+                    className="inline-flex items-center justify-center w-4 h-4 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <i className="pi pi-info-circle text-xs" />
+                  </button>
+                  <Tooltip target={`#${tooltipTargetId}`} content={RENEWAL_MSG} position="top" style={{ maxWidth: '240px' }} />
+                </span>
               ) : connected.tokenExpiresAt ? (
-                <span className="text-gray-400">
-                  Expires {new Date(connected.tokenExpiresAt).toLocaleDateString()}
+                <span className="flex items-center gap-1">
+                  <span className="text-gray-400">
+                    Expires {new Date(connected.tokenExpiresAt).toLocaleDateString()}
+                  </span>
+                  <button
+                    id={tooltipTargetId}
+                    type="button"
+                    aria-label="About automatic token renewal"
+                    className="inline-flex items-center justify-center w-4 h-4 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <i className="pi pi-info-circle text-xs" />
+                  </button>
+                  <Tooltip target={`#${tooltipTargetId}`} content={RENEWAL_MSG} position="top" style={{ maxWidth: '240px' }} />
                 </span>
               ) : null}
             </div>

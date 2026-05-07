@@ -288,11 +288,11 @@ export default function CreateCampaignPage() {
     [updateFragment, refetchFragments],
   );
 
-  const handleRegenerate = useCallback(async () => {
+  const handleRegenerate = useCallback(async (additionalInstructions: string) => {
     if (!videoId) return;
     setRegenerating(true);
     try {
-      await processVideo(videoId, {});
+      await processVideo(videoId, { additionalInstructions: additionalInstructions || undefined });
       toast.current?.show({
         severity: 'info',
         summary: 'Regenerating',

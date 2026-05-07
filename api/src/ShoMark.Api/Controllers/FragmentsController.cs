@@ -68,4 +68,11 @@ public class FragmentsController : ControllerBase
         return result.IsSuccess ? Ok(new { url = result.Value }) : NotFound(new { result.Error, result.ErrorCode });
     }
 
+    [HttpGet("{id:guid}/clip-url")]
+    public async Task<IActionResult> GetClipUrl(Guid id, CancellationToken ct)
+    {
+        var result = await _fragmentService.GetClipUrlAsync(id, ct);
+        return result.IsSuccess ? Ok(new { url = result.Value }) : NotFound(new { result.Error, result.ErrorCode });
+    }
+
 }

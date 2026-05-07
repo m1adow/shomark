@@ -133,6 +133,22 @@ public class AiFragmentService : IAiFragmentService
         return Result<string>.Success(url);
     }
 
+    public async Task<Result<string>> GetClipUrlAsync(Guid id, CancellationToken ct = default)
+    {
+        var fragment = await _fragmentRepository.GetByIdAsync(id, ct);
+        if (fragment is null)
+            return Result<string>.Failure(Constants.Errors.Messages.FragmentNotFound, Constants.Errors.Codes.NotFound);
+
+        if (string.IsNullOrEmpty(fragment.StorageKey))
+            return Result<string>.Failure(Constants.Errors.Messages.NoClipAvailable, Constants.Errors.Codes.NotFound);
+
+        var url = await GetPresignedUrlAsync(fragment.StorageKey, ct);
+        if (url is null)
+            return Result<string>.Failure(Constants.Errors.Messages.ClipUrlGenerationFailed, Constants.Errors.Codes.StorageError);
+
+        return Result<string>.Success(url);
+    }
+
     private async Task<string?> GetPresignedUrlAsync(string? storageKey, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(storageKey)) return null;

@@ -3,6 +3,7 @@ using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ShoMark.Application.Common;
+using ShoMark.Application.DTOs.Videos;
 using ShoMark.Application.Interfaces;
 using ShoMark.Domain.Enums;
 
@@ -12,7 +13,9 @@ namespace ShoMark.Infrastructure.Messaging;
 /// Kafka producer that sends video-processing requests to the worker.
 /// Message format:
 /// {"video_bucket": "...", "video_key": "...", "output_bucket": "...", "output_prefix": "...",
-///  "target_audience": "Applicants|Masters|Professionals", "description": "..."}
+///  "target_audience": "Applicants|Masters|Professionals", "description": "...",
+///  "additional_instructions": "...",
+///  "exclude_ranges": [{"start": 10.5, "end": 70.5}, ...]}
 /// </summary>
 public class KafkaVideoProcessingProducer : IVideoProcessingProducer, IDisposable
 {
@@ -43,6 +46,8 @@ public class KafkaVideoProcessingProducer : IVideoProcessingProducer, IDisposabl
         string outputPrefix,
         TargetAudience? targetAudience = null,
         string? description = null,
+        string? additionalInstructions = null,
+        IReadOnlyList<ExcludeRange>? excludeRanges = null,
         CancellationToken ct = default)
     {
         var message = new
@@ -53,6 +58,8 @@ public class KafkaVideoProcessingProducer : IVideoProcessingProducer, IDisposabl
             output_prefix = outputPrefix,
             target_audience = targetAudience?.ToString(),
             description,
+            additional_instructions = additionalInstructions,
+            exclude_ranges = excludeRanges?.Select(r => new { start = r.Start, end = r.End }).ToArray(),
         };
 
         var payload = JsonSerializer.Serialize(message);

@@ -63,6 +63,8 @@ class VideoHighlightService:
         output_prefix = message.get("output_prefix", "")
         target_audience = message.get("target_audience")
         description = message.get("description")
+        additional_instructions = message.get("additional_instructions")
+        exclude_ranges: list[dict] | None = message.get("exclude_ranges") or None
 
         work_dir = f"/tmp/work/{uuid.uuid4().hex}"
         local_video = os.path.join(work_dir, "source.mp4")
@@ -100,6 +102,8 @@ class VideoHighlightService:
                 segments,
                 target_audience=target_audience,
                 description=description,
+                additional_instructions=additional_instructions,
+                exclude_ranges=exclude_ranges,
             )
             timings["llm"] = time.perf_counter() - t0
             if not highlights:
