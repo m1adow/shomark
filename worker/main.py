@@ -5,6 +5,7 @@ from storage import StorageClient
 from transcriber import Transcriber
 from llm import LLMClient
 from highlight_finder import HighlightFinder
+from reframer import Reframer
 from video_processor import VideoProcessor
 from service import VideoHighlightService
 from producer import EventProducer
@@ -28,7 +29,8 @@ def main() -> None:
     # Domain components
     transcriber = Transcriber(config)
     highlight_finder = HighlightFinder(llm, config)
-    video_processor = VideoProcessor()
+    reframer = Reframer(config, storage=storage)
+    video_processor = VideoProcessor(reframer=reframer)
 
     # Service (orchestration)
     service = VideoHighlightService(

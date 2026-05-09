@@ -90,3 +90,58 @@ class StorageClient:
             content_type="application/json",
         )
         logger.info("Transcript cache written: %s/%s (%d bytes)", bucket, key, len(payload))
+
+    # ------------------------------------------------------------------
+    # Trajectory cache helpers
+    # ------------------------------------------------------------------
+
+    def load_trajectory_cache(
+        self, bucket: str, key: str
+    ) -> list[list[float]] | None:
+        """Load a cached reframing trajectory from MinIO.
+
+        Returns the deserialized ``[[t, x], …]`` list on a hit, or ``None``
+        on a miss / any error so callers can always fall back to recomputing.
+        """
+        try:
+            if not self._client.bucket_exists(bucket):
+                return None
+            response = self._client.get_object(bucket, key)
+            try:
+                data = json.loads(response.read().decode("utf-8"))
+            finally:
+                response.close()
+                response.release_conn()
+            logger.info(
+                "Trajectory cache HIT: %s/%s (%d points)", bucket, key, len(data)
+            )
+            return data
+        except S3Error:
+            return None
+        except Exception as exc:
+            logger.warning(
+                "Trajectory cache load failed (%s/%s): %s", bucket, key, exc
+            )
+            return None
+
+    def save_trajectory_cache(
+        self,
+        bucket: str,
+        key: str,
+        trajectory: list[tuple[float, int]],
+    ) -> None:
+        """Persist a reframing trajectory to MinIO as a compact JSON array."""
+        if not self._client.bucket_exists(bucket):
+            self._client.make_bucket(bucket)
+            logger.info("Created cache bucket: %s", bucket)
+        payload = json.dumps([[t, x] for t, x in trajectory]).encode("utf-8")
+        self._client.put_object(
+            bucket,
+            key,
+            io.BytesIO(payload),
+            length=len(payload),
+            content_type="application/json",
+        )
+        logger.info(
+            "Trajectory cache written: %s/%s (%d bytes)", bucket, key, len(payload)
+        )
