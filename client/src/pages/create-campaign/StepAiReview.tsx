@@ -1,19 +1,34 @@
 import { useState, useRef } from 'react';
 import { Button } from 'primereact/button';
 import { Card } from 'primereact/card';
+import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Message } from 'primereact/message';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { AiFragmentDto } from '../../api/types';
+import FragmentClipPreviewDialog from '../../components/FragmentClipPreviewDialog';
 import { useFragmentThumbnailUrl } from '../../hooks/useFragments';
 
-function FragmentThumbnail({ fragmentId, index }: { fragmentId: string; index: number }) {
+function FragmentThumbnail({
+  fragmentId,
+  index,
+  onPreview,
+}: {
+  fragmentId: string;
+  index: number;
+  onPreview: (id: string) => void;
+}) {
   const { data } = useFragmentThumbnailUrl(fragmentId);
   const [imgLoaded, setImgLoaded] = useState(false);
 
   return (
-    <div className="relative w-full h-full">
+    <button
+      type="button"
+      aria-label={`Preview clip ${index + 1}`}
+      className="group relative h-full w-full overflow-hidden text-left"
+      onClick={() => onPreview(fragmentId)}
+    >
       {/* Shimmer skeleton shown until image loads */}
       {(!data?.url || !imgLoaded) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 animate-pulse">
@@ -34,7 +49,12 @@ function FragmentThumbnail({ fragmentId, index }: { fragmentId: string; index: n
           transition={{ duration: 0.4 }}
         />
       )}
-    </div>
+      <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/35 group-focus-visible:bg-black/35">
+        <span className="flex h-12 w-12 scale-90 items-center justify-center rounded-full bg-white/90 text-blue-600 opacity-0 shadow-lg transition-all group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100">
+          <i className="pi pi-play text-lg ml-0.5" />
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -216,7 +236,7 @@ interface Props {
   onApprove: (id: string) => Promise<void>;
   onUpdateCaption: (id: string, description: string) => void;
   onUpdateHashtags: (id: string, hashtags: string) => void;
-  onRegenerate: () => void;
+  onRegenerate: (additionalInstructions: string) => void;
   regenerating: boolean;
 }
 
@@ -240,6 +260,15 @@ export default function StepAiReview({
   const [editingCaptions, setEditingCaptions] = useState<Record<string, string>>({});
   const [editingHashtags, setEditingHashtags] = useState<Record<string, string>>({});
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
+  const [regenerateInstructions, setRegenerateInstructions] = useState('');
+  const [previewFragmentId, setPreviewFragmentId] = useState<string | null>(null);
+
+  const handleRegenerateConfirm = () => {
+    onRegenerate(regenerateInstructions.trim());
+    setRegenerateDialogOpen(false);
+    setRegenerateInstructions('');
+  };
 
   const handleApproveClick = async (id: string) => {
     setApprovingId(id);
@@ -335,7 +364,7 @@ export default function StepAiReview({
     return (
       <div className="max-w-2xl mx-auto space-y-4">
         <Message severity="error" text={error} className="w-full" />
-        <Button label="Retry" icon="pi pi-refresh" onClick={onRegenerate} />
+        <Button label="Retry" icon="pi pi-refresh" onClick={() => onRegenerate('')} />
       </div>
     );
   }
@@ -358,7 +387,7 @@ export default function StepAiReview({
           {/* Fancy Regenerate Button */}
           <button
             disabled={regenerating}
-            onClick={onRegenerate}
+            onClick={() => setRegenerateDialogOpen(true)}
             className={`
               relative group px-5 py-2.5 rounded-xl font-semibold text-sm
               transition-all duration-300 ease-out overflow-hidden
@@ -406,7 +435,11 @@ export default function StepAiReview({
                     <div className="flex items-start gap-4">
                       {/* Thumbnail */}
                       <div className="flex-shrink-0 w-40 h-28 rounded overflow-hidden bg-gray-200">
-                        <FragmentThumbnail fragmentId={frag.id} index={idx} />
+                        <FragmentThumbnail
+                          fragmentId={frag.id}
+                          index={idx}
+                          onPreview={setPreviewFragmentId}
+                        />
                       </div>
 
                       <div className="flex-1 min-w-0 space-y-2">
@@ -491,6 +524,50 @@ export default function StepAiReview({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Regenerate dialog */}
+      <Dialog
+        header="Regenerate clips"
+        visible={regenerateDialogOpen}
+        onHide={() => { setRegenerateDialogOpen(false); setRegenerateInstructions(''); }}
+        style={{ width: '480px' }}
+        footer={
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              label="Cancel"
+              severity="secondary"
+              outlined
+              onClick={() => { setRegenerateDialogOpen(false); setRegenerateInstructions(''); }}
+            />
+            <Button
+              label="Regenerate"
+              icon="pi pi-refresh"
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 border-0"
+              onClick={handleRegenerateConfirm}
+            />
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-500">
+            Existing clips will not be re-selected. Optionally provide additional focus instructions for the AI.
+          </p>
+          <InputTextarea
+            value={regenerateInstructions}
+            onChange={(e) => setRegenerateInstructions(e.target.value)}
+            rows={4}
+            autoResize
+            placeholder="e.g. Focus more on scholarship opportunities and student testimonials…"
+            className="w-full"
+          />
+        </div>
+      </Dialog>
+
+      <FragmentClipPreviewDialog
+        fragmentId={previewFragmentId}
+        visible={previewFragmentId !== null}
+        onHide={() => setPreviewFragmentId(null)}
+      />
     </div>
   );
 }

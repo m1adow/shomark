@@ -1,3 +1,4 @@
+using ShoMark.Application.DTOs.Videos;
 using ShoMark.Domain.Enums;
 
 namespace ShoMark.Application.Interfaces;
@@ -14,5 +15,7 @@ public interface IVideoProcessingProducer
         string outputPrefix,
         TargetAudience? targetAudience = null,
         string? description = null,
+        string? additionalInstructions = null,
+        IReadOnlyList<ExcludeRange>? excludeRanges = null,
         CancellationToken ct = default);
 }

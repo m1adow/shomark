@@ -42,3 +42,21 @@ class Config:
 
     # Whisper batched inference (0 = disabled, use standard transcribe)
     whisper_batch_size: int = int(os.getenv("WHISPER_BATCH_SIZE", "16"))
+
+    # Reframer — dynamic saliency-based 9:16 crop
+    reframer_sample_fps: float = float(os.getenv("REFRAMER_SAMPLE_FPS", "5"))
+    reframer_smoothing_alpha: float = float(os.getenv("REFRAMER_SMOOTHING_ALPHA", "0.15"))
+    reframer_dead_zone_pct: float = float(os.getenv("REFRAMER_DEAD_ZONE_PCT", "0.02"))
+    reframer_scene_cut_threshold: float = float(os.getenv("REFRAMER_SCENE_CUT_THRESHOLD", "0.4"))
+    reframer_face_boost_sigma_pct: float = float(os.getenv("REFRAMER_FACE_BOOST_SIGMA_PCT", "0.10"))
+    reframer_enable_face_detection: bool = (
+        os.getenv("REFRAMER_ENABLE_FACE_DETECTION", "true").lower() == "true"
+    )
+    # Encoder: "libx264" (default, broadest compatibility) or "h264_nvenc" (GPU, ~3-5x faster).
+    # h264_nvenc is probed at startup; falls back to libx264 if not compiled in.
+    reframer_encoder: str = os.getenv("REFRAMER_ENCODER", "libx264")
+    # Trajectory cache: when true, reuses computed trajectories across reprocessing runs.
+    # Cache key = SHA-256(clip_hash + analysis settings). Stored in cache_bucket under trajectories/.
+    reframer_cache_enabled: bool = (
+        os.getenv("REFRAMER_CACHE_ENABLED", "false").lower() == "true"
+    )

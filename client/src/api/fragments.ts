@@ -29,4 +29,7 @@ export const fragmentsApi = {
 
   getThumbnailUrl: (id: string, signal?: AbortSignal) =>
     get<{ url: string }>(`${PATH}/${id}/thumbnail-url`, signal),
+
+  getClipUrl: (id: string, signal?: AbortSignal) =>
+    get<{ url: string }>(`${PATH}/${id}/clip-url`, signal),
 };

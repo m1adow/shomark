@@ -56,3 +56,11 @@ export function useFragmentThumbnailUrl(id: string, enabled = true) {
     { enabled },
   );
 }
+
+export function useFragmentClipUrl(id: string, enabled = false) {
+  return useApiQuery(
+    (signal) => fragmentsApi.getClipUrl(id, signal),
+    [id],
+    { enabled },
+  );
+}

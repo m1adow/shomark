@@ -16,6 +16,8 @@ public static partial class Constants
             public const string FragmentNotFound = "Fragment not found";
             public const string NoThumbnailAvailable = "No thumbnail available";
             public const string ThumbnailUrlGenerationFailed = "Failed to generate thumbnail URL";
+            public const string NoClipAvailable = "No clip available";
+            public const string ClipUrlGenerationFailed = "Failed to generate clip URL";
             public const string StartTimeMustBeLessThanEndTime = "StartTime must be less than EndTime";
 
             // Post

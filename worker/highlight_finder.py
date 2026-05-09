@@ -75,6 +75,8 @@ class HighlightFinder:
         chunk: list[dict],
         target_audience: str | None,
         description: str | None,
+        additional_instructions: str | None = None,
+        exclude_ranges: list[dict] | None = None,
     ) -> str:
         profile = _audience_profile(target_audience)
         compact = self._compact_segments(chunk)
@@ -83,12 +85,21 @@ class HighlightFinder:
         if description:
             context_block = f"\nКОНТЕКСТ КАМПАНІЇ: {description}\n"
 
+        exclude_block = ""
+        if exclude_ranges:
+            ranges_str = ", ".join(f"{r['start']:.1f}s–{r['end']:.1f}s" for r in exclude_ranges)
+            exclude_block = f"\nВЖЕ ВИБРАНІ КЛІПИ (не вибирай нові, що перекривають ці діапазони): {ranges_str}\n"
+
+        instructions_block = ""
+        if additional_instructions:
+            instructions_block = f"\nДОДАТКОВІ ІНСТРУКЦІЇ ВІД КОРИСТУВАЧА: {additional_instructions}\n"
+
         return f"""/no_think
 МОВА ВІДПОВІДІ: УКРАЇНСЬКА. Усі поля (title, reason, hashtags) — ТІЛЬКИ українською мовою.
 
 Ти — експерт з вірального контенту.
 Цільова аудиторія: {profile["persona"]}.
-Платформи публікації: {profile["platform"]}.{context_block}
+Платформи публікації: {profile["platform"]}.{context_block}{exclude_block}{instructions_block}
 
 Ось транскрипт фрагменту відео (s — час початку в секундах, e — час кінця, t — текст):
 {json.dumps(compact, ensure_ascii=False)}
@@ -119,11 +130,13 @@ class HighlightFinder:
         chunk_id: int,
         target_audience: str | None,
         description: str | None,
+        additional_instructions: str | None = None,
+        exclude_ranges: list[dict] | None = None,
     ) -> list[dict]:
         """Find candidate highlights in one transcript chunk."""
         t0 = time.perf_counter()
         logger.info("MAP: Processing chunk %d (%d segments)", chunk_id, len(chunk))
-        prompt = self._build_map_prompt(chunk, target_audience, description)
+        prompt = self._build_map_prompt(chunk, target_audience, description, additional_instructions, exclude_ranges)
         candidates = self._llm.generate_json_array(prompt)
         logger.info("MAP chunk %d: found %d candidates (%.1fs)", chunk_id, len(candidates), time.perf_counter() - t0)
         return candidates
@@ -135,6 +148,8 @@ class HighlightFinder:
         candidates: list[dict],
         target_audience: str | None,
         description: str | None,
+        additional_instructions: str | None = None,
+        exclude_ranges: list[dict] | None = None,
     ) -> str:
         profile = _audience_profile(target_audience)
 
@@ -142,11 +157,20 @@ class HighlightFinder:
         if description:
             context_block = f"\nКОНТЕКСТ КАМПАНІЇ: {description}\n"
 
+        exclude_block = ""
+        if exclude_ranges:
+            ranges_str = ", ".join(f"{r['start']:.1f}s–{r['end']:.1f}s" for r in exclude_ranges)
+            exclude_block = f"\nВЖЕ ВИБРАНІ КЛІПИ (відхили будь-який кандидат, що перекриває ці діапазони): {ranges_str}\n"
+
+        instructions_block = ""
+        if additional_instructions:
+            instructions_block = f"\nДОДАТКОВІ ІНСТРУКЦІЇ ВІД КОРИСТУВАЧА: {additional_instructions}\n"
+
         return f"""/no_think
 МОВА ВІДПОВІДІ: УКРАЇНСЬКА. Усі поля (title, reason, hashtags) — ТІЛЬКИ українською мовою.
 
 Ти — SMM-менеджер, який готує контент для {profile["platform"]}.
-Цільова аудиторія: {profile["persona"]}.{context_block}
+Цільова аудиторія: {profile["persona"]}.{context_block}{exclude_block}{instructions_block}
 
 З цих {len(candidates)} кандидатів вибери {self._top_highlights} найкращі кліпи:
 {json.dumps(candidates, ensure_ascii=False)}
@@ -168,6 +192,8 @@ class HighlightFinder:
         candidates: list[dict],
         target_audience: str | None,
         description: str | None,
+        additional_instructions: str | None = None,
+        exclude_ranges: list[dict] | None = None,
     ) -> list[dict]:
         """Select top N highlights from all candidates."""
         t0 = time.perf_counter()
@@ -179,7 +205,7 @@ class HighlightFinder:
             for c in candidates
         ]
 
-        prompt = self._build_reduce_prompt(trimmed, target_audience, description)
+        prompt = self._build_reduce_prompt(trimmed, target_audience, description, additional_instructions, exclude_ranges)
         result = self._llm.generate_json_array(prompt)
         if not result:
             logger.warning("REDUCE returned empty; falling back to first %d candidates", self._top_highlights)
@@ -236,6 +262,8 @@ class HighlightFinder:
         segments: list[dict],
         target_audience: str | None = None,
         description: str | None = None,
+        additional_instructions: str | None = None,
+        exclude_ranges: list[dict] | None = None,
     ) -> list[dict]:
         """Run full map-reduce pipeline: split segments, map in parallel, reduce."""
         t_total = time.perf_counter()
@@ -250,7 +278,7 @@ class HighlightFinder:
         t_map = time.perf_counter()
         with ThreadPoolExecutor(max_workers=len(chunks)) as pool:
             futures = {
-                pool.submit(self.map_highlights, chunk, i + 1, target_audience, description): i
+                pool.submit(self.map_highlights, chunk, i + 1, target_audience, description, additional_instructions, exclude_ranges): i
                 for i, chunk in enumerate(chunks)
             }
             for future in as_completed(futures):
@@ -265,7 +293,7 @@ class HighlightFinder:
             return []
 
         t_reduce = time.perf_counter()
-        result = self.reduce_highlights(all_candidates, target_audience, description)
+        result = self.reduce_highlights(all_candidates, target_audience, description, additional_instructions, exclude_ranges)
         logger.info(
             "Highlight detection done — map=%.1fs | reduce=%.1fs | total=%.1fs",
             t_reduce - t_map,

@@ -11,17 +11,20 @@ namespace ShoMark.Application.Services;
 public class VideoService : IVideoService
 {
     private readonly IVideoRepository _videoRepository;
+    private readonly IAiFragmentRepository _fragmentRepository;
     private readonly IVideoProcessingProducer _processingProducer;
     private readonly IStorageService _storageService;
     private readonly StorageOptions _storageOptions;
 
     public VideoService(
         IVideoRepository videoRepository,
+        IAiFragmentRepository fragmentRepository,
         IVideoProcessingProducer processingProducer,
         IStorageService storageService,
         IOptions<StorageOptions> storageOptions)
     {
         _videoRepository = videoRepository;
+        _fragmentRepository = fragmentRepository;
         _processingProducer = processingProducer;
         _storageService = storageService;
         _storageOptions = storageOptions.Value;
@@ -119,9 +122,18 @@ public class VideoService : IVideoService
         var outputBucket = request.OutputBucket ?? Constants.Storage.HighlightsBucket;
         var outputPrefix = request.OutputPrefix ?? $"{video.Id}/";
 
+        // Derive existing fragment time ranges so the worker can skip them
+        var existingFragments = await _fragmentRepository.GetByVideoIdAsync(id, ct);
+        var excludeRanges = existingFragments.Count > 0
+            ? existingFragments
+                .Select(f => new ExcludeRange(f.StartTime, f.EndTime))
+                .ToList()
+            : null;
+
         await _processingProducer.SendProcessingRequestAsync(
             videoBucket, videoKey, outputBucket, outputPrefix,
-            request.TargetAudience, request.Description, ct);
+            request.TargetAudience, request.Description,
+            request.AdditionalInstructions, excludeRanges, ct);
 
         return Result<bool>.Success(true);
     }

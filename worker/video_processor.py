@@ -8,10 +8,17 @@ logger = logging.getLogger(__name__)
 
 
 class VideoProcessor:
-    """Cut highlight clips from a source video using FFmpeg."""
+    """Cut and dynamically reframe highlight clips from a source video.
 
-    def __init__(self, output_dir: str = "/tmp/highlights") -> None:
+    Each clip is produced in two passes:
+    1. A fast lossless cut (``-c copy``) isolates the highlight segment.
+    2. ``Reframer`` analyses per-frame saliency to build a smooth 9:16 crop
+       trajectory, then re-encodes with FFmpeg's ``sendcmd`` filter.
+    """
+
+    def __init__(self, output_dir: str = "/tmp/highlights", reframer=None) -> None:
         self._output_dir = output_dir
+        self._reframer = reframer
 
     def cut_highlights(self, video_path: str, highlights: list[dict], output_dir: str | None = None) -> list[dict]:
         """Cut clips and return a list of {"path": ..., "title": ..., "reason": ...}.
@@ -33,9 +40,21 @@ class VideoProcessor:
             output_path = os.path.join(effective_dir, f"highlight_{i + 1}.mp4")
             preview_path = os.path.join(effective_dir, f"highlight_{i + 1}_preview.jpg")
             logger.info("Cutting clip %d: %.1fs -> %.1fs", i + 1, start, end)
-            self._cut_vertical(video_path, start, end, output_path)
-            preview_time = start + (end - start) * 0.25
-            self._extract_frame(video_path, preview_time, preview_path)
+
+            # Pass 1: lossless cut to an isolated segment
+            segment_path = output_path + ".seg.mp4"
+            self._cut_segment(video_path, start, end, segment_path)
+            try:
+                # Pass 2: saliency-based reframing → final 9:16 output
+                trajectory = self._reframer.compute_trajectory(segment_path)
+                self._reframer.render(segment_path, trajectory, output_path)
+            finally:
+                if os.path.exists(segment_path):
+                    os.remove(segment_path)
+
+            # Preview from the reframed output (reflects the actual crop)
+            preview_offset = (end - start) * 0.25
+            self._extract_frame(output_path, preview_offset, preview_path)
             return {
                 "path": output_path,
                 "preview_path": preview_path,
@@ -75,29 +94,19 @@ class VideoProcessor:
         return float(info["format"]["duration"])
 
     @staticmethod
-    def _cut_vertical(video_path: str, start: float, end: float, output_path: str) -> None:
-        """Cut a segment and encode to 9:16 (1080x1920) optimized for TikTok/Reels/Shorts."""
+    def _cut_segment(video_path: str, start: float, end: float, output_path: str) -> None:
+        """Lossless cut of [start, end] from *video_path* into *output_path*.
+
+        Uses stream-copy (``-c copy``) so this is near-instant and preserves
+        the original encoding for the subsequent reframing pass.
+        """
         subprocess.run(
             [
                 "ffmpeg", "-y",
                 "-ss", f"{start:.3f}",
                 "-to", f"{end:.3f}",
                 "-i", video_path,
-                "-vf", (
-                    "crop=ih*9/16:ih,"      # center-crop to 9:16 aspect ratio
-                    "scale=1080:1920,"       # scale to 1080x1920 (upscale if needed)
-                    "setsar=1"               # square pixels
-                ),
-                "-r", "30",                          # 30 fps (platform standard)
-                "-c:v", "libx264",
-                "-profile:v", "high",                # H.264 High profile
-                "-level:v", "4.0",                   # max device compatibility
-                "-preset", "fast",
-                "-crf", "23",
-                "-pix_fmt", "yuv420p",               # required for mobile playback
-                "-c:a", "aac", "-b:a", "128k",
-                "-ar", "44100",                      # 44.1 kHz audio (platform standard)
-                "-movflags", "+faststart",           # moov atom at start for instant playback
+                "-c", "copy",
                 "-avoid_negative_ts", "make_zero",
                 output_path,
             ],
