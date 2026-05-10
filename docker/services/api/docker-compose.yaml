@@ -1,31 +1,116 @@
 services:
-  api:
+  gateway:
     build:
       context: ../../../api
       dockerfile: Dockerfile
-    container_name: api
+      args:
+        PROJECT_PATH: src/gateway/ShoMark.Gateway/ShoMark.Gateway.csproj
+        PROJECT_DLL: ShoMark.Gateway.dll
+    container_name: gateway
     ports:
-      - "${API_PORT}:8080"
+      - "${API_PORT:-5000}:8080"
     depends_on:
-      - kafka
-      - postgres
-      - minio
+      - campaign-api
+      - social-api
+      - notification-api
       - keycloak
     environment:
-      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_HTTP_PORTS=8080
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - Keycloak__Authority=http://keycloak:8080/realms/${KEYCLOAK_REALM:-shomark}
+      - Keycloak__ValidIssuer=http://localhost:${KEYCLOAK_PORT:-8180}/realms/${KEYCLOAK_REALM:-shomark}
+      - Keycloak__Audience=${KEYCLOAK_CLIENT_ID:-shomark-api}
+      - Keycloak__RequireHttpsMetadata=false
+      - Cors__AllowedOrigins__0=http://localhost:${CLIENT_PORT:-3000}
+
+  campaign-api:
+    build:
+      context: ../../../api
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/campaign/ShoMark.Services.Campaign.Api/ShoMark.Services.Campaign.Api.csproj
+        PROJECT_DLL: ShoMark.Services.Campaign.Api.dll
+    container_name: campaign-api
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+      minio:
+        condition: service_started
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=campaigns_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
       - Kafka__BootstrapServers=kafka:29092
       - Kafka__VideoProcessingTopic=video-processing
       - Kafka__CompletionTopic=video-processing-completed
-      - Kafka__ConsumerGroupId=api-group
-      - Keycloak__Authority=http://keycloak:8080/realms/${KEYCLOAK_REALM}
-      - Keycloak__ValidIssuer=http://localhost:${KEYCLOAK_PORT}/realms/${KEYCLOAK_REALM}
-      - Keycloak__Audience=${KEYCLOAK_CLIENT_ID}
-      - Keycloak__RequireHttpsMetadata=false
-      - Cors__AllowedOrigins__0=http://localhost:${CLIENT_PORT}
+      - Kafka__VideoProcessingSucceededTopic=video-processing-succeeded
+      - Kafka__FragmentApprovedTopic=fragment-approved
+      - Kafka__CampaignStatusChangedTopic=campaign-status-changed
+      - Kafka__ConsumerGroupId=campaign-api-group
+      - Storage__Provider=Minio
+      - Storage__VideoBucket=videos
       - Minio__Endpoint=minio:9000
-      - Minio__AccessKey=${MINIO_ROOT_USER}
-      - Minio__SecretKey=${MINIO_ROOT_PASSWORD}
+      - Minio__AccessKey=${MINIO_ROOT_USER:-admin}
+      - Minio__SecretKey=${MINIO_ROOT_PASSWORD:-password123}
       - Minio__Secure=false
-      - Minio__PublicEndpoint=localhost:${MINIO_API_PORT}
+      - Minio__PublicEndpoint=localhost:${MINIO_API_PORT:-9000}
+
+  social-api:
+    build:
+      context: ../../../api
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/social/ShoMark.Services.Social.Api/ShoMark.Services.Social.Api.csproj
+        PROJECT_DLL: ShoMark.Services.Social.Api.dll
+    container_name: social-api
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+      minio:
+        condition: service_started
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=social_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      - Kafka__BootstrapServers=kafka:29092
+      - Kafka__VideoProcessingSucceededTopic=video-processing-succeeded
+      - Kafka__FragmentApprovedTopic=fragment-approved
+      - Kafka__PostPublishedTopic=post-published
+      - Kafka__PostFailedTopic=post-failed
+      - Kafka__ConsumerGroupId=social-api-group
+      - Frontend__BaseUrl=http://localhost:${CLIENT_PORT:-3000}
+      - Storage__Provider=Minio
+      - Storage__VideoBucket=videos
+      - Minio__Endpoint=minio:9000
+      - Minio__AccessKey=${MINIO_ROOT_USER:-admin}
+      - Minio__SecretKey=${MINIO_ROOT_PASSWORD:-password123}
+      - Minio__Secure=false
+      - Minio__PublicEndpoint=localhost:${MINIO_API_PORT:-9000}
+
+  notification-api:
+    build:
+      context: ../../../api
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/notification/ShoMark.Services.Notification.Api/ShoMark.Services.Notification.Api.csproj
+        PROJECT_DLL: ShoMark.Services.Notification.Api.dll
+    container_name: notification-api
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=notifications_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      - Kafka__BootstrapServers=kafka:29092
+      - Kafka__FragmentApprovedTopic=fragment-approved
+      - Kafka__CampaignStatusChangedTopic=campaign-status-changed
+      - Kafka__PostPublishedTopic=post-published
+      - Kafka__PostFailedTopic=post-failed
+      - Kafka__ConsumerGroupId=notification-api-group

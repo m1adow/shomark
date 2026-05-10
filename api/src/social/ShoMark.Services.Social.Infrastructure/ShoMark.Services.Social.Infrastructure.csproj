@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShoMark.Services.Social.Domain\ShoMark.Services.Social.Domain.csproj" />
+    <ProjectReference Include="..\ShoMark.Services.Social.Application\ShoMark.Services.Social.Application.csproj" />
+    <ProjectReference Include="..\..\shared\ShoMark.Contracts\ShoMark.Contracts.csproj" />
+    <ProjectReference Include="..\..\shared\ShoMark.Messaging\ShoMark.Messaging.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="Confluent.Kafka" />
+    <PackageReference Include="Minio" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

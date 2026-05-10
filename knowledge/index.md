@@ -14,6 +14,7 @@ Developer documentation for the ShoMark video highlight extraction and campaign 
 
 | Note | Description |
 |------|-------------|
+| [[microservices-architecture]] | Gateway BFF, service boundaries, databases, and Kafka event contracts |
 | [[keycloak]] | Set up the Keycloak realm, client, and test users for JWT authentication |
 | [[ollama]] | Run the local Ollama LLM server and manage models for highlight detection |
 

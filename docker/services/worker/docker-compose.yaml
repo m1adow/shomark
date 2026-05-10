@@ -2,9 +2,12 @@ services:
   worker:
     build: ../../../worker
     depends_on:
-      - kafka
-      - minio
-      - ollama
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      ollama:
+        condition: service_started
     environment:
       - PYTHONIOENCODING=utf-8
       - LANG=C.UTF-8
@@ -17,11 +20,11 @@ services:
       - KAFKA_SESSION_TIMEOUT_MS=60000        # 60 seconds heartbeat timeout
       # MinIO
       - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-admin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-password123}
       # Ollama
       - OLLAMA_URL=http://ollama:11434/api/generate
-      - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4:e4b}
       - OLLAMA_TIMEOUT=300
       - OLLAMA_NUM_PREDICT=1024
       # Whisper GPU
@@ -36,7 +39,7 @@ services:
       - ../../../worker:/app
     # Optional: If you have an NVIDIA GPU, uncomment the lines below to make Whisper 10x faster
     deploy:
-      replicas: ${WORKER_REPLICAS}
+      replicas: ${WORKER_REPLICAS:-3}
       resources:
         reservations:
           devices:

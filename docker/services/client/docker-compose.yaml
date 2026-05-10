@@ -4,12 +4,14 @@ services:
       context: ../../../client
       dockerfile: Dockerfile
       args:
-        VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL}
-        VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM}
-        VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID}
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-http://localhost:8180}
+        VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-shomark}
+        VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-shomark-api}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     container_name: client
     ports:
-      - "${CLIENT_PORT}:3000"
+      - "${CLIENT_PORT:-3000}:3000"
     depends_on:
-      - api
+      - gateway
+    environment:
+      - API_URL=http://gateway:8080

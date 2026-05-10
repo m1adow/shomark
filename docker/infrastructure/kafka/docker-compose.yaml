@@ -3,7 +3,7 @@ services:
     image: apache/kafka:latest
     container_name: kafka
     ports:
-      - "${KAFKA_PORT}:9092"
+      - "${KAFKA_PORT:-9092}:9092"
     environment:
       # KRaft configuration (No Zookeeper needed)
       KAFKA_NODE_ID: 1
@@ -23,14 +23,63 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    command:
+      - /bin/sh
+      - -c
+      - |
+        /etc/kafka/docker/run &
+        kafka_pid=$$!
+
+        trap 'kill -TERM "$$kafka_pid"; wait "$$kafka_pid"' TERM INT
+
+        until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list >/dev/null 2>&1; do
+          echo "Waiting for Kafka..."
+          sleep 2
+        done
+
+        for topic in \
+          video-processing \
+          video-processing-completed \
+          video-processing-succeeded \
+          fragment-approved \
+          campaign-status-changed \
+          post-published \
+          post-failed; do
+          /opt/kafka/bin/kafka-topics.sh \
+            --bootstrap-server kafka:29092 \
+            --create \
+            --if-not-exists \
+            --topic "$$topic" \
+            --partitions 1 \
+            --replication-factor 1
+        done
+
+        wait "$$kafka_pid"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |
+          topics=$$(/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list 2>/dev/null) &&
+          echo "$$topics" | grep -Fx video-processing >/dev/null &&
+          echo "$$topics" | grep -Fx video-processing-completed >/dev/null &&
+          echo "$$topics" | grep -Fx video-processing-succeeded >/dev/null &&
+          echo "$$topics" | grep -Fx fragment-approved >/dev/null &&
+          echo "$$topics" | grep -Fx campaign-status-changed >/dev/null &&
+          echo "$$topics" | grep -Fx post-published >/dev/null &&
+          echo "$$topics" | grep -Fx post-failed >/dev/null
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 15s
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     ports:
-      - "${KAFKA_UI_PORT}:8080"
+      - "${KAFKA_UI_PORT:-8080}:8080"
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     environment:
       # Connect the UI to the internal Kafka listener
       KAFKA_CLUSTERS_0_NAME: local-cluster

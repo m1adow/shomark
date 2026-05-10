@@ -4,22 +4,26 @@
     "azure-compute": {
       "source": "microsoft/azure-skills",
       "sourceType": "github",
-      "computedHash": "fb6a8fb3578c21c47e2ad794e0fe67d08a1f3c39912d286a9fdfd3a550d8b3b4"
+      "skillPath": "skills/azure-compute/SKILL.md",
+      "computedHash": "19f51e07e1ab2fa34706050843e8688e5fdb03af6e134eeca894468cd7a99c16"
     },
     "azure-cost": {
       "source": "microsoft/azure-skills",
       "sourceType": "github",
+      "skillPath": "skills/azure-cost/SKILL.md",
       "computedHash": "c2e6430e746847f0dbb5a2040f56f364972c6d5a996a24852ccc0bc981fcb4d9"
     },
     "azure-deploy": {
       "source": "microsoft/azure-skills",
       "sourceType": "github",
-      "computedHash": "7b62a5c55c7d83434fd1ef68b145281cf3e7ed6b01b4093c51d87111cc2e8309"
+      "skillPath": "skills/azure-deploy/SKILL.md",
+      "computedHash": "d9030d755b4294c945123a099c5492abdf260e868f0e9aa0e0ec0e5b0ebe23f9"
     },
     "azure-prepare": {
       "source": "microsoft/azure-skills",
       "sourceType": "github",
-      "computedHash": "4b8d5098ca167f4d82b1a9e424a9f5b78893cb382489b65030a4a0aef1e436ab"
+      "skillPath": "skills/azure-prepare/SKILL.md",
+      "computedHash": "acf0b92eb3fa7b7afdc5448d8b3ff40cae74086f4fb349f209fd2fb0770061a1"
     },
     "database-schema-design": {
       "source": "supercent-io/skills-template",

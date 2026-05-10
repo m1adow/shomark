@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\shared\ShoMark.Common\ShoMark.Common.csproj" />
+    <ProjectReference Include="..\ShoMark.Services.Campaign.Application\ShoMark.Services.Campaign.Application.csproj" />
+    <ProjectReference Include="..\ShoMark.Services.Campaign.Infrastructure\ShoMark.Services.Campaign.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+
+</Project>

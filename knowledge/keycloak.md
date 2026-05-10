@@ -73,7 +73,23 @@ Copy the `access_token` from the response and use it in the Scalar UI (**Bearer*
 Authorization: Bearer <access_token>
 ```
 
-## 6. Configuration Reference
+## 6. Gateway BFF Auth Flow
+
+ShoMark now validates JWTs only in `ShoMark.Gateway`. The gateway proxies `/api/**` with YARP and overwrites trusted internal headers before forwarding to downstream APIs:
+
+| Header | Source |
+|--------|--------|
+| `X-User-Id` | `sub` / name identifier claim |
+| `X-User-Email` | `email` claim |
+| `X-User-Name` | `name`, `preferred_username`, or name claim |
+
+Campaign, Social, and Notification APIs trust these headers on the Docker network and do not validate JWTs themselves. Their containers are internal only; only `gateway` is published on `${API_PORT}`.
+
+SSE endpoints still work with browser `EventSource`: the gateway accepts `access_token` query parameters for `/api/videos/{id}/events` and `/api/notifications/stream`, validates the token, then forwards trusted headers downstream.
+
+OAuth platform callbacks under `/api/oauth/{platform}/callback` are anonymous at the gateway so external providers can complete the redirect into Social API.
+
+## 7. Configuration Reference
 
 | Setting | Value |
 |---------|-------|
@@ -83,11 +99,12 @@ Authorization: Bearer <access_token>
 | Token endpoint | `http://localhost:8180/realms/shomark/protocol/openid-connect/token` |
 | JWKS endpoint | `http://localhost:8180/realms/shomark/protocol/openid-connect/certs` |
 | API audience (appsettings) | `shomark-api` |
-| API authority (appsettings) | `http://keycloak:8080/realms/shomark` (docker) / `http://localhost:8180/realms/shomark` (dev) |
+| Gateway authority (appsettings) | `http://keycloak:8080/realms/shomark` (docker) / `http://localhost:8180/realms/shomark` (dev) |
 
 ---
 
 ## See Also
 
 - [[social-media-integration]] — OAuth flow and publishing pipeline that uses these JWT tokens
+- [[microservices-architecture]] — gateway, service boundaries, and trusted headers
 - [[index]] — Knowledge base home

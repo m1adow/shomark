@@ -42,7 +42,7 @@ Instagram content publishing uses the **Facebook Graph API** through a Meta App.
 9. Find **Facebook Login for Business** → click **Set up**.
 10. In the left sidebar, go to **Facebook Login for Business** → **Settings**:
     - Enable **Client OAuth Login** and **Web OAuth Login**.
-    - Add the redirect URI: `http://localhost:5145/api/oauth/Instagram/callback`
+    - Add the redirect URI: `http://localhost:5000/api/oauth/Instagram/callback`
     - Click **Save Changes**.
 
 **Add Instagram Graph API and permissions:**
@@ -90,7 +90,7 @@ The correct values come from **App Settings → Basic**:
 
 **Section 3 — Set up Instagram business login:**
 - Click **Set up** to open the OAuth / redirect URI configuration.
-- Add the redirect URI: `http://localhost:5145/api/oauth/Instagram/callback`
+- Add the redirect URI: `http://localhost:5000/api/oauth/Instagram/callback`
 - Configure the required permissions: `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`
 
 **Section 4 — Complete app review:** Only required for Live mode. In **Development Mode**, skip this step — permissions work for test users without review.
@@ -101,7 +101,7 @@ The correct values come from **App Settings → Basic**:
 "Instagram": {
   "ClientId": "<App ID>",
   "ClientSecret": "<App Secret>",
-  "RedirectUri": "http://localhost:5145/api/oauth/Instagram/callback",
+  "RedirectUri": "http://localhost:5000/api/oauth/Instagram/callback",
   "Scopes": "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"
 }
 ```
@@ -141,9 +141,9 @@ TikTok **does not accept `localhost`** as a redirect URI. To test locally, use *
    ```
    winget install ngrok
    ```
-2. Start a tunnel on the API port:
+2. Start a tunnel on the gateway/API port:
    ```
-   ngrok http 5145
+   ngrok http 5000
    ```
 3. Copy the generated URL (e.g., `https://xxxx-xxxx.ngrok-free.app`).
 4. In the TikTok Developer Portal → your app → **Login Kit** settings, enter:
@@ -191,7 +191,7 @@ Uses **Google OAuth 2.0** with the **YouTube Data API v3** for uploading Shorts.
 7. Back in **Create OAuth client ID**:
    - **Application type:** Web application
    - **Name:** `ShoMark`
-   - **Authorized redirect URIs:** `http://localhost:5145/api/oauth/YouTube/callback`
+   - **Authorized redirect URIs:** `http://localhost:5000/api/oauth/YouTube/callback`
    - Click **Create**.
 8. Copy the **Client ID** and **Client Secret** from the confirmation dialog.
 
@@ -203,7 +203,7 @@ Uses **Google OAuth 2.0** with the **YouTube Data API v3** for uploading Shorts.
 "YouTube": {
   "ClientId": "<Client ID>",
   "ClientSecret": "<Client Secret>",
-  "RedirectUri": "http://localhost:5145/api/oauth/YouTube/callback",
+  "RedirectUri": "http://localhost:5000/api/oauth/YouTube/callback",
   "Scopes": "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly"
 }
 ```
@@ -228,7 +228,7 @@ Uses **X OAuth 2.0** with PKCE for the **X API v2**.
    - Under **User authentication settings**, click **Set up**.
    - **App permissions:** Read and write
    - **Type of App:** Web App, Automated App or Bot
-   - **Callback URI / Redirect URL:** `http://localhost:5145/api/oauth/X/callback`
+   - **Callback URI / Redirect URL:** `http://localhost:5000/api/oauth/X/callback`
    - **Website URL:** `http://localhost:5173` (or your domain)
    - Save.
 6. Go to the **Keys and tokens** tab:
@@ -244,7 +244,7 @@ Uses **X OAuth 2.0** with PKCE for the **X API v2**.
 "X": {
   "ClientId": "<Client ID>",
   "ClientSecret": "<Client Secret>",
-  "RedirectUri": "http://localhost:5145/api/oauth/X/callback",
+  "RedirectUri": "http://localhost:5000/api/oauth/X/callback",
   "Scopes": "tweet.read tweet.write users.read offline.access"
 }
 ```

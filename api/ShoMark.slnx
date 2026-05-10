@@ -1,8 +1,28 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/ShoMark.Api/ShoMark.Api.csproj" />
-    <Project Path="src/ShoMark.Application/ShoMark.Application.csproj" />
-    <Project Path="src/ShoMark.Domain/ShoMark.Domain.csproj" />
-    <Project Path="src/ShoMark.Infrastructure/ShoMark.Infrastructure.csproj" />
+  <Folder Name="/src/shared/">
+    <Project Path="src/shared/ShoMark.Common/ShoMark.Common.csproj" />
+    <Project Path="src/shared/ShoMark.Contracts/ShoMark.Contracts.csproj" />
+    <Project Path="src/shared/ShoMark.Messaging/ShoMark.Messaging.csproj" />
+  </Folder>
+  <Folder Name="/src/gateway/">
+    <Project Path="src/gateway/ShoMark.Gateway/ShoMark.Gateway.csproj" />
+  </Folder>
+  <Folder Name="/src/services/campaign/">
+    <Project Path="src/campaign/ShoMark.Services.Campaign.Api/ShoMark.Services.Campaign.Api.csproj" />
+    <Project Path="src/campaign/ShoMark.Services.Campaign.Application/ShoMark.Services.Campaign.Application.csproj" />
+    <Project Path="src/campaign/ShoMark.Services.Campaign.Domain/ShoMark.Services.Campaign.Domain.csproj" />
+    <Project Path="src/campaign/ShoMark.Services.Campaign.Infrastructure/ShoMark.Services.Campaign.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/services/social/">
+    <Project Path="src/social/ShoMark.Services.Social.Api/ShoMark.Services.Social.Api.csproj" />
+    <Project Path="src/social/ShoMark.Services.Social.Application/ShoMark.Services.Social.Application.csproj" />
+    <Project Path="src/social/ShoMark.Services.Social.Domain/ShoMark.Services.Social.Domain.csproj" />
+    <Project Path="src/social/ShoMark.Services.Social.Infrastructure/ShoMark.Services.Social.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/services/notification/">
+    <Project Path="src/notification/ShoMark.Services.Notification.Api/ShoMark.Services.Notification.Api.csproj" />
+    <Project Path="src/notification/ShoMark.Services.Notification.Application/ShoMark.Services.Notification.Application.csproj" />
+    <Project Path="src/notification/ShoMark.Services.Notification.Domain/ShoMark.Services.Notification.Domain.csproj" />
+    <Project Path="src/notification/ShoMark.Services.Notification.Infrastructure/ShoMark.Services.Notification.Infrastructure.csproj" />
   </Folder>
 </Solution>
