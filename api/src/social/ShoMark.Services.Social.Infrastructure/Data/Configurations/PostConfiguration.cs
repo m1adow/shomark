@@ -23,6 +23,7 @@ public class PostConfiguration : IEntityTypeConfiguration<Post>
         builder.Property(p => p.Title).HasColumnName("title").HasMaxLength(500);
         builder.Property(p => p.Content).HasColumnName("content").HasColumnType("text");
         builder.Property(p => p.ExternalUrl).HasColumnName("external_url").HasMaxLength(1000);
+        builder.Property(p => p.ExternalPostId).HasColumnName("external_post_id").HasMaxLength(500);
         builder.Property(p => p.Status).HasColumnName("status").HasMaxLength(20)
             .HasConversion<string>();
         builder.Property(p => p.ScheduledAt).HasColumnName("scheduled_at");

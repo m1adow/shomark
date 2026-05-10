@@ -1,5 +1,5 @@
 import { get, put } from './client';
-import type { AnalyticsDto, UpdateAnalyticsRequest } from './types';
+import type { AnalyticsDto, CampaignAnalyticsDto, UpdateAnalyticsRequest } from './types';
 
 const PATH = '/analytics';
 
@@ -9,4 +9,7 @@ export const analyticsApi = {
 
   upsert: (postId: string, req: UpdateAnalyticsRequest, signal?: AbortSignal) =>
     put<AnalyticsDto>(`${PATH}/post/${postId}`, req, signal),
+
+  getCampaignAnalytics: (campaignId: string, signal?: AbortSignal) =>
+    get<CampaignAnalyticsDto>(`${PATH}/campaigns/${campaignId}`, signal),
 };

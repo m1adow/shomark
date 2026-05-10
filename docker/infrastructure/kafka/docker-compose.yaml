@@ -44,7 +44,8 @@ services:
           fragment-approved \
           campaign-status-changed \
           post-published \
-          post-failed; do
+          post-failed \
+          platform-token-expired; do
           /opt/kafka/bin/kafka-topics.sh \
             --bootstrap-server kafka:29092 \
             --create \
@@ -66,7 +67,8 @@ services:
           echo "$$topics" | grep -Fx fragment-approved >/dev/null &&
           echo "$$topics" | grep -Fx campaign-status-changed >/dev/null &&
           echo "$$topics" | grep -Fx post-published >/dev/null &&
-          echo "$$topics" | grep -Fx post-failed >/dev/null
+          echo "$$topics" | grep -Fx post-failed >/dev/null &&
+          echo "$$topics" | grep -Fx platform-token-expired >/dev/null
       interval: 5s
       timeout: 10s
       retries: 30

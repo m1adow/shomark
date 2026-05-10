@@ -35,6 +35,7 @@ Developer documentation for the ShoMark video highlight extraction and campaign 
 | Feature | Details |
 |---------|----------|
 | **Generated clip preview** | React clip thumbnails in campaign creation open a modal video preview on click. The client lazily calls `GET /api/fragments/{id}/clip-url`, which returns a presigned MinIO URL for the fragment `StorageKey`. Thumbnail images continue to use `GET /api/fragments/{id}/thumbnail-url`. |
+| **Campaign analytics dashboard** | `CampaignDetailsPage` now renders KPI cards, a per-platform bar chart, a trend line chart, and a per-post DataTable. Data comes from `GET /api/analytics/campaigns/{id}` served by the new Analytics microservice. |
 
 ## Integrations
 

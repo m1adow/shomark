@@ -18,8 +18,9 @@ ShoMark is split into a monorepo microservices architecture behind a Gateway BFF
 |---------|----------------|----------|
 | `ShoMark.Gateway` | YARP routing, Keycloak JWT validation, trusted user header injection, SSE proxying | none |
 | `ShoMark.Services.Campaign.Api` | Videos, AI fragments, campaign lifecycle, worker completion events | `campaigns_db` |
-| `ShoMark.Services.Social.Api` | Connected platforms, OAuth, posts, publishing, analytics | `social_db` |
+| `ShoMark.Services.Social.Api` | Connected platforms, OAuth, posts, publishing, per-post analytics | `social_db` |
 | `ShoMark.Services.Notification.Api` | Notifications and notification SSE streams | `notifications_db` |
+| `ShoMark.Services.Analytics.Api` | Campaign-level analytics aggregation, metric snapshot sync from platform APIs | `analytics_db` |
 
 Each service keeps its own Domain / Application / Infrastructure / Api projects. Shared cross-service pieces live in:
 
@@ -29,6 +30,7 @@ api/src/
   campaign/ShoMark.Services.Campaign.{Api,Application,Domain,Infrastructure}/
   social/ShoMark.Services.Social.{Api,Application,Domain,Infrastructure}/
   notification/ShoMark.Services.Notification.{Api,Application,Domain,Infrastructure}/
+  analytics/ShoMark.Services.Analytics.{Api,Infrastructure}/
   shared/ShoMark.{Common,Contracts,Messaging}/
 ```
 
@@ -60,19 +62,21 @@ Downstream services trust these headers because they are internal Docker service
 | `campaign-status-changed` | Campaign API | Notification API |
 | `post-published` | Social API | Notification API |
 | `post-failed` | Social API | Notification API |
+| `platform-token-expired` | Analytics API | Notification API |
 
 Social API stores approved fragment projections from `fragment-approved` and snapshots fragment media fields onto posts. Notification API creates persistent notifications from the domain events it consumes and pushes new notification DTOs over SSE.
 
 ## Docker Runtime
 
-`docker/services/api/docker-compose.yaml` starts four .NET containers:
+`docker/services/api/docker-compose.yaml` starts five .NET containers:
 
 - `gateway` exposed on `${API_PORT}`
 - `campaign-api` internal only
 - `social-api` internal only
 - `notification-api` internal only
+- `analytics-api` internal only
 
-PostgreSQL initialization creates `campaigns_db`, `social_db`, and `notifications_db` through `docker/infrastructure/postgres/init/01-create-service-databases.sql`.
+PostgreSQL initialization creates `campaigns_db`, `social_db`, `notifications_db`, and `analytics_db` through `docker/infrastructure/postgres/init/01-create-service-databases.sql`.
 
 Compose files provide local-development defaults for ports, credentials, Keycloak realm/client, Vite build args, Ollama model, and worker replica count. A `docker/.env` file or `--env-file` still overrides them, but plain `docker compose` commands from the `docker` directory no longer interpolate empty values.
 

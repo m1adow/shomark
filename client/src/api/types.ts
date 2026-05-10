@@ -56,6 +56,59 @@ export interface AnalyticsSummaryDto {
   lastSyncedAt: string | null;
 }
 
+// ── Campaign Analytics ────────────────────────────────────────────────────────
+
+export interface CampaignAnalyticsSummaryDto {
+  totalViews: number;
+  totalLikes: number;
+  totalShares: number;
+  totalComments: number;
+  engagementRate: number;
+  totalPosts: number;
+  publishedPosts: number;
+  scheduledPosts: number;
+  failedPosts: number;
+}
+
+export interface PlatformAnalyticsDto {
+  platform: string;
+  views: number;
+  likes: number;
+  shares: number;
+  comments: number;
+  engagementRate: number;
+  postCount: number;
+}
+
+export interface PostAnalyticsDto {
+  postId: string;
+  title: string | null;
+  platform: string;
+  status: string;
+  publishedAt: string | null;
+  views: number;
+  likes: number;
+  shares: number;
+  comments: number;
+  engagementRate: number;
+}
+
+export interface TrendPointDto {
+  date: string;
+  views: number;
+  likes: number;
+  shares: number;
+  comments: number;
+  engagementRate: number;
+}
+
+export interface CampaignAnalyticsDto {
+  summary: CampaignAnalyticsSummaryDto;
+  platforms: PlatformAnalyticsDto[];
+  posts: PostAnalyticsDto[];
+  trend: TrendPointDto[];
+}
+
 export const TargetAudience = {
   Applicants: 0,
   Masters: 1,

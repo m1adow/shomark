@@ -13,6 +13,7 @@ services:
       - campaign-api
       - social-api
       - notification-api
+      - analytics-api
       - keycloak
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
@@ -114,3 +115,26 @@ services:
       - Kafka__PostPublishedTopic=post-published
       - Kafka__PostFailedTopic=post-failed
       - Kafka__ConsumerGroupId=notification-api-group
+
+  analytics-api:
+    build:
+      context: ../../../api
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: src/analytics/ShoMark.Services.Analytics.Api/ShoMark.Services.Analytics.Api.csproj
+        PROJECT_DLL: ShoMark.Services.Analytics.Api.dll
+    container_name: analytics-api
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__AnalyticsConnection=Host=postgres;Port=5432;Database=analytics_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      - ConnectionStrings__SocialConnection=Host=postgres;Port=5432;Database=social_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      - ConnectionStrings__CampaignsConnection=Host=postgres;Port=5432;Database=campaigns_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      - Kafka__BootstrapServers=kafka:29092
+      - Kafka__PlatformTokenExpiredTopic=platform-token-expired
+      - Kafka__ConsumerGroupId=analytics-api-group

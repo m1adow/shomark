@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShoMark.Services.Analytics.Infrastructure\ShoMark.Services.Analytics.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\shared\ShoMark.Common\ShoMark.Common.csproj" />
+  </ItemGroup>
+
+</Project>

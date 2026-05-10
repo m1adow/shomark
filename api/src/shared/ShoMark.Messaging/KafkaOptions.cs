@@ -14,5 +14,6 @@ public class KafkaOptions
     public string CampaignStatusChangedTopic { get; set; } = KafkaTopics.CampaignStatusChanged;
     public string PostPublishedTopic { get; set; } = KafkaTopics.PostPublished;
     public string PostFailedTopic { get; set; } = KafkaTopics.PostFailed;
+    public string PlatformTokenExpiredTopic { get; set; } = KafkaTopics.PlatformTokenExpired;
     public string ConsumerGroupId { get; set; } = "api-group";
 }

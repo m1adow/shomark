@@ -126,6 +126,7 @@ public class PostPublishingService : IPostPublishingService
             post.Status = PostStatus.Published;
             post.PublishedAt = DateTime.UtcNow;
             post.ExternalUrl = result.ExternalUrl;
+            post.ExternalPostId = result.ExternalPostId;
             await _postRepository.UpdateAsync(post, ct);
 
             await _eventPublisher.PublishAsync(

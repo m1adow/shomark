@@ -11,6 +11,14 @@ export function usePostAnalytics(postId: string) {
   );
 }
 
+export function useCampaignAnalytics(campaignId: string) {
+  return useApiQuery(
+    (signal) => analyticsApi.getCampaignAnalytics(campaignId, signal),
+    [campaignId],
+    { enabled: campaignId.length > 0 },
+  );
+}
+
 export function useUpsertAnalytics() {
   return useApiMutation(
     useCallback(

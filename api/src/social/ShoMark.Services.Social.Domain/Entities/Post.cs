@@ -15,6 +15,7 @@ public class Post : BaseEntity
     public string? Title { get; set; }
     public string? Content { get; set; }
     public string? ExternalUrl { get; set; }
+    public string? ExternalPostId { get; set; }
     public PostStatus Status { get; set; } = PostStatus.Draft;
     public DateTime? ScheduledAt { get; set; }
     public DateTime? PublishedAt { get; set; }

@@ -9,3 +9,6 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'social_db')\gexec
 
 SELECT 'CREATE DATABASE notifications_db'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'notifications_db')\gexec
+
+SELECT 'CREATE DATABASE analytics_db'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'analytics_db')\gexec

@@ -6,7 +6,11 @@ import { Tag } from 'primereact/tag';
 import { ProgressSpinner } from 'primereact/progressspinner';
 import { Toast } from 'primereact/toast';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
+import { Chart } from 'primereact/chart';
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
 import { useCampaign, useDeleteCampaign } from '../hooks/useCampaigns';
+import { useCampaignAnalytics } from '../hooks/useAnalytics';
 
 function statusSeverity(status: string) {
   switch (status) {
@@ -22,6 +26,7 @@ export default function CampaignDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: campaign, loading, error } = useCampaign(id!);
+  const { data: analytics, loading: analyticsLoading } = useCampaignAnalytics(id!);
   const { execute: deleteCampaign } = useDeleteCampaign();
   const toast = useRef<Toast>(null);
 
@@ -61,6 +66,28 @@ export default function CampaignDetailsPage() {
     );
   }
 
+  // Chart data
+  const barChartData = {
+    labels: analytics?.platforms.map((p) => p.platform) ?? [],
+    datasets: [
+      { label: 'Views', data: analytics?.platforms.map((p) => p.views) ?? [], backgroundColor: '#6366f1' },
+      { label: 'Likes', data: analytics?.platforms.map((p) => p.likes) ?? [], backgroundColor: '#f59e0b' },
+      { label: 'Shares', data: analytics?.platforms.map((p) => p.shares) ?? [], backgroundColor: '#10b981' },
+      { label: 'Comments', data: analytics?.platforms.map((p) => p.comments) ?? [], backgroundColor: '#3b82f6' },
+    ],
+  };
+
+  const lineChartData = {
+    labels: analytics?.trend.map((t) => t.date) ?? [],
+    datasets: [
+      { label: 'Views', data: analytics?.trend.map((t) => t.views) ?? [], borderColor: '#6366f1', fill: false, tension: 0.4 },
+      { label: 'Likes', data: analytics?.trend.map((t) => t.likes) ?? [], borderColor: '#f59e0b', fill: false, tension: 0.4 },
+      { label: 'Engagement %', data: analytics?.trend.map((t) => t.engagementRate) ?? [], borderColor: '#10b981', fill: false, tension: 0.4 },
+    ],
+  };
+
+  const chartOptions = { maintainAspectRatio: false, responsive: true };
+
   return (
     <div>
       <Toast ref={toast} position="top-right" />
@@ -82,7 +109,8 @@ export default function CampaignDetailsPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Campaign metadata */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <Card title="Details" className="shadow-sm">
           <div className="space-y-4">
             <InfoRow label="Status" value={campaign.status} />
@@ -93,13 +121,69 @@ export default function CampaignDetailsPage() {
           </div>
         </Card>
 
-        <Card title="Performance" className="shadow-sm">
-          <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-            <i className="pi pi-chart-bar text-4xl mb-3" />
-            <p className="text-sm">Analytics coming soon</p>
-          </div>
+        {/* KPI summary cards */}
+        <Card title="Performance Overview" className="shadow-sm">
+          {analyticsLoading ? (
+            <div className="flex justify-center py-8">
+              <ProgressSpinner style={{ width: '32px', height: '32px' }} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <KpiCard icon="pi-eye" label="Views" value={analytics?.summary.totalViews ?? 0} color="indigo" />
+              <KpiCard icon="pi-heart" label="Likes" value={analytics?.summary.totalLikes ?? 0} color="amber" />
+              <KpiCard icon="pi-share-alt" label="Shares" value={analytics?.summary.totalShares ?? 0} color="emerald" />
+              <KpiCard icon="pi-comments" label="Comments" value={analytics?.summary.totalComments ?? 0} color="blue" />
+              <KpiCard icon="pi-percentage" label="Engagement" value={`${analytics?.summary.engagementRate ?? 0}%`} color="purple" />
+              <KpiCard icon="pi-file" label="Posts" value={analytics?.summary.totalPosts ?? 0} color="gray" />
+              <KpiCard icon="pi-check-circle" label="Published" value={analytics?.summary.publishedPosts ?? 0} color="green" />
+              <KpiCard icon="pi-clock" label="Scheduled" value={analytics?.summary.scheduledPosts ?? 0} color="orange" />
+            </div>
+          )}
         </Card>
       </div>
+
+      {/* Charts */}
+      {!analyticsLoading && analytics && analytics.platforms.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <Card title="Platform Breakdown" className="shadow-sm">
+            <div style={{ height: '280px' }}>
+              <Chart type="bar" data={barChartData} options={chartOptions} />
+            </div>
+          </Card>
+          <Card title="Trend Over Time" className="shadow-sm">
+            <div style={{ height: '280px' }}>
+              <Chart type="line" data={lineChartData} options={chartOptions} />
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Per-post breakdown table */}
+      <Card title="Posts" className="shadow-sm">
+        {analyticsLoading ? (
+          <div className="flex justify-center py-8">
+            <ProgressSpinner style={{ width: '32px', height: '32px' }} />
+          </div>
+        ) : (
+          <DataTable
+            value={analytics?.posts ?? []}
+            emptyMessage="No posts in this campaign yet."
+            sortMode="single"
+            stripedRows
+            size="small"
+          >
+            <Column field="title" header="Title" sortable body={(row) => row.title ?? '—'} />
+            <Column field="platform" header="Platform" sortable />
+            <Column field="status" header="Status" sortable body={(row) => <Tag value={row.status} severity={statusSeverity(row.status)} />} />
+            <Column field="publishedAt" header="Published" sortable body={(row) => row.publishedAt ? new Date(row.publishedAt).toLocaleDateString() : '—'} />
+            <Column field="views" header="Views" sortable />
+            <Column field="likes" header="Likes" sortable />
+            <Column field="shares" header="Shares" sortable />
+            <Column field="comments" header="Comments" sortable />
+            <Column field="engagementRate" header="Eng. %" sortable body={(row) => `${row.engagementRate}%`} />
+          </DataTable>
+        )}
+      </Card>
     </div>
   );
 }
@@ -112,3 +196,16 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function KpiCard({ icon, label, value, color }: { icon: string; label: string; value: number | string; color: string }) {
+  return (
+    <div className={`flex items-center gap-3 p-3 rounded-lg bg-${color}-50`}>
+      <i className={`pi ${icon} text-xl text-${color}-500`} />
+      <div>
+        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-lg font-semibold text-gray-800">{value.toLocaleString()}</p>
+      </div>
+    </div>
+  );
+}
+

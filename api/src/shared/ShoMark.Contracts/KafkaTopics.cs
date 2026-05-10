@@ -9,4 +9,5 @@ public static class KafkaTopics
     public const string CampaignStatusChanged = "campaign-status-changed";
     public const string PostPublished = "post-published";
     public const string PostFailed = "post-failed";
+    public const string PlatformTokenExpired = "platform-token-expired";
 }

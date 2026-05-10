@@ -25,4 +25,8 @@
     <Project Path="src/notification/ShoMark.Services.Notification.Domain/ShoMark.Services.Notification.Domain.csproj" />
     <Project Path="src/notification/ShoMark.Services.Notification.Infrastructure/ShoMark.Services.Notification.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/services/analytics/">
+    <Project Path="src/analytics/ShoMark.Services.Analytics.Infrastructure/ShoMark.Services.Analytics.Infrastructure.csproj" />
+    <Project Path="src/analytics/ShoMark.Services.Analytics.Api/ShoMark.Services.Analytics.Api.csproj" />
+  </Folder>
 </Solution>
