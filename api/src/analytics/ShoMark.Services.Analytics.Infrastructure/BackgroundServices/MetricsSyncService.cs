@@ -1,10 +1,12 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using ShoMark.Analytics.Infrastructure.Entities;
+using ShoMark.Analytics.Domain.Entities;
 using ShoMark.Analytics.Infrastructure.Persistence;
+using ShoMark.Analytics.Infrastructure.Providers;
 using ShoMark.Messaging;
 
 namespace ShoMark.Analytics.Infrastructure.BackgroundServices;
@@ -21,17 +23,23 @@ public class MetricsSyncService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IKafkaEventPublisher _kafka;
     private readonly KafkaOptions _kafkaOptions;
+    private readonly IDataProtector _protector;
+    private readonly IReadOnlyDictionary<string, IPlatformAnalyticsProvider> _providers;
     private readonly ILogger<MetricsSyncService> _logger;
 
     public MetricsSyncService(
         IServiceScopeFactory scopeFactory,
         IKafkaEventPublisher kafka,
         IOptions<KafkaOptions> kafkaOptions,
+        IDataProtectionProvider dataProtectionProvider,
+        IEnumerable<IPlatformAnalyticsProvider> providers,
         ILogger<MetricsSyncService> logger)
     {
         _scopeFactory = scopeFactory;
         _kafka = kafka;
         _kafkaOptions = kafkaOptions.Value;
+        _protector = dataProtectionProvider.CreateProtector("ShoMark.Tokens.v1");
+        _providers = providers.ToDictionary(p => p.PlatformType);
         _logger = logger;
     }
 
@@ -113,8 +121,28 @@ public class MetricsSyncService : BackgroundService
                 }
             }
 
-            // Fetch metrics from platform API (stubbed — real implementations go here)
-            var metrics = await FetchPlatformMetricsAsync(post, ct);
+            // Decrypt access token
+            if (post.Platform.AccessToken is null)
+            {
+                _logger.LogWarning("No access token for PostId={PostId}, skipping", post.Id);
+                return;
+            }
+
+            string accessToken;
+            try
+            {
+                accessToken = _protector.Unprotect(post.Platform.AccessToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to decrypt access token for PostId={PostId} (Platform={Platform}), skipping",
+                    post.Id, post.Platform.PlatformType);
+                return;
+            }
+
+            // Fetch metrics from platform API
+            var metrics = await FetchPlatformMetricsAsync(post, accessToken, ct);
 
             analyticsDb.PostMetricSnapshots.Add(new PostMetricSnapshot
             {
@@ -150,24 +178,26 @@ public class MetricsSyncService : BackgroundService
     }
 
     /// <summary>
-    /// Fetches metrics from the platform's analytics API using the ExternalPostId.
-    /// Platform-specific implementations should be injected via IPlatformAnalyticsProvider.
-    /// Currently returns zeros — wire up real API calls per platform.
+    /// Dispatches to the registered IPlatformAnalyticsProvider for the post's platform.
+    /// Returns zero metrics for platforms without a registered provider (LinkedIn, Telegram).
     /// </summary>
-    private Task<(long Views, long Likes, long Shares, long Comments)> FetchPlatformMetricsAsync(
+    private async Task<PlatformMetrics> FetchPlatformMetricsAsync(
         PostReadModel post,
+        string accessToken,
         CancellationToken ct)
     {
         _logger.LogDebug(
             "Fetching metrics for PostId={PostId}, ExternalPostId={ExternalPostId}, Platform={Platform}",
             post.Id, post.ExternalPostId, post.Platform.PlatformType);
 
-        // TODO: implement per-platform analytics API calls:
-        // Instagram: GET /v19.0/{media-id}/insights?metric=impressions,reach,likes,comments,shares
-        // YouTube:   GET https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==MINE&metrics=views,likes,comments,shares
-        // TikTok:    POST /v2/video/query/views/
-        // X:         GET /2/tweets/{id}?tweet.fields=public_metrics
+        if (!_providers.TryGetValue(post.Platform.PlatformType, out var provider))
+        {
+            _logger.LogWarning(
+                "No analytics provider registered for platform {Platform}. Skipping metrics fetch.",
+                post.Platform.PlatformType);
+            return new PlatformMetrics(0, 0, 0, 0);
+        }
 
-        return Task.FromResult((Views: 0L, Likes: 0L, Shares: 0L, Comments: 0L));
+        return await provider.FetchAsync(post.ExternalPostId!, accessToken, ct);
     }
 }

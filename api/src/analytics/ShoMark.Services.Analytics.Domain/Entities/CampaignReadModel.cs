@@ -1,4 +1,4 @@
-namespace ShoMark.Analytics.Infrastructure.Entities;
+namespace ShoMark.Analytics.Domain.Entities;
 
 /// <summary>Read-only projection of campaigns_db.campaigns used by the Analytics service.</summary>
 public class CampaignReadModel

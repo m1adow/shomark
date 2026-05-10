@@ -1,4 +1,4 @@
-namespace ShoMark.Analytics.Infrastructure.Entities;
+namespace ShoMark.Analytics.Domain.Entities;
 
 /// <summary>Read-only projection of social_db.posts used by the Analytics service.</summary>
 public class PostReadModel

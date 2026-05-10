@@ -1,4 +1,4 @@
-namespace ShoMark.Analytics.Infrastructure.Entities;
+namespace ShoMark.Analytics.Domain.Entities;
 
 public class PostMetricSnapshot
 {

@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <PackageReference Include="Confluent.Kafka" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -14,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ShoMark.Services.Analytics.Domain\ShoMark.Services.Analytics.Domain.csproj" />
     <ProjectReference Include="..\..\shared\ShoMark.Messaging\ShoMark.Messaging.csproj" />
   </ItemGroup>
 

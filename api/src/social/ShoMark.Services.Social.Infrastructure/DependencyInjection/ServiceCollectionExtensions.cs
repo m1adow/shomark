@@ -32,10 +32,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPlatformRepository, PlatformRepository>();
         services.AddScoped<IFragmentProjectionRepository, FragmentProjectionRepository>();
 
+        // Persist Data Protection keys in social_db so the Analytics service
+        // can share the same key ring for decrypting platform tokens.
+        // Run: dotnet ef migrations add AddDataProtectionKeys --context DataProtectionKeysContext
+        services.AddDbContext<DataProtectionKeysContext>(options =>
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
         services.AddDataProtection()
             .SetApplicationName("ShoMark.Social")
-            .PersistKeysToFileSystem(new DirectoryInfo(
-                Path.Combine(AppContext.BaseDirectory, "DataProtection-Keys")));
+            .PersistKeysToDbContext<DataProtectionKeysContext>();
         services.AddSingleton<ITokenEncryptionService, DataProtectionTokenEncryptionService>();
 
         services.AddMemoryCache();

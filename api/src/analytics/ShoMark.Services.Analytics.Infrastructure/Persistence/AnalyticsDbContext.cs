@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using ShoMark.Analytics.Infrastructure.Entities;
+using ShoMark.Analytics.Domain.Entities;
 
 namespace ShoMark.Analytics.Infrastructure.Persistence;
 
