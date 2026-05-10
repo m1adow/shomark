@@ -26,13 +26,6 @@ public class PostRepository : Repository<Post>, IPostRepository
             .ToListAsync(ct);
     }
 
-    public async Task<Post?> GetWithAnalyticsAsync(Guid id, CancellationToken ct = default)
-    {
-        return await DbSet.AsNoTracking()
-            .Include(p => p.Analytics)
-            .FirstOrDefaultAsync(p => p.Id == id, ct);
-    }
-
     public async Task<IReadOnlyList<Post>> GetByCampaignIdAsync(Guid campaignId, CancellationToken ct = default)
     {
         return await DbSet.AsNoTracking()

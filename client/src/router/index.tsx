@@ -2,9 +2,6 @@ import { createBrowserRouter } from 'react-router-dom';
 import AppLayout from '../components/layout/AppLayout';
 import DashboardPage from '../pages/DashboardPage';
 import CampaignsPage from '../pages/CampaignsPage';
-import CampaignDetailsPage from '../pages/CampaignDetailsPage';
-import CreateCampaignPage from '../pages/create-campaign/CreateCampaignPage';
-import AnalyticsPage from '../pages/AnalyticsPage';
 import SettingsPage from '../pages/SettingsPage';
 import OAuthCallbackPage from '../pages/OAuthCallbackPage';
 
@@ -46,14 +43,6 @@ export const router = createBrowserRouter([
     element: (
       <AppLayout>
         <CreateCampaignPage />
-      </AppLayout>
-    ),
-  },
-  {
-    path: '/analytics',
-    element: (
-      <AppLayout>
-        <AnalyticsPage />
       </AppLayout>
     ),
   },

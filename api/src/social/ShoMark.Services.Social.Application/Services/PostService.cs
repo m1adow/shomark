@@ -47,27 +47,6 @@ public class PostService : IPostService
             posts.Select(p => p.ToDto()).ToList());
     }
 
-    public async Task<Result<PostWithAnalyticsDto>> GetWithAnalyticsAsync(Guid id, CancellationToken ct = default)
-    {
-        var post = await _postRepository.GetWithAnalyticsAsync(id, ct);
-        if (post is null)
-            return Result<PostWithAnalyticsDto>.Failure(Constants.Errors.Messages.PostNotFound, Constants.Errors.Codes.NotFound);
-
-        var analyticsDto = post.Analytics is not null
-            ? new AnalyticsSummaryDto(
-                post.Analytics.Views, post.Analytics.Likes,
-                post.Analytics.Shares, post.Analytics.Comments,
-                post.Analytics.LastSyncedAt)
-            : null;
-
-        var dto = new PostWithAnalyticsDto(
-            post.Id, post.FragmentId, post.PlatformId, post.CampaignId, post.Title, post.Content,
-            post.ExternalUrl, post.Status.ToString(), post.ScheduledAt, post.PublishedAt,
-            post.CreatedAt, analyticsDto);
-
-        return Result<PostWithAnalyticsDto>.Success(dto);
-    }
-
     public async Task<Result<PostDto>> CreateAsync(CreatePostRequest request, CancellationToken ct = default)
     {
         var fragment = await _fragmentProjectionRepository.GetByFragmentIdAsync(request.FragmentId, ct);

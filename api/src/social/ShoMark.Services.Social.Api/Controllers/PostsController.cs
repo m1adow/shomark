@@ -39,13 +39,6 @@ public class PostsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { result.Error, result.ErrorCode });
     }
 
-    [HttpGet("{id:guid}/analytics")]
-    public async Task<IActionResult> GetWithAnalytics(Guid id, CancellationToken ct)
-    {
-        var result = await _postService.GetWithAnalyticsAsync(id, ct);
-        return result.IsSuccess ? Ok(result.Value) : NotFound(new { result.Error, result.ErrorCode });
-    }
-
     [HttpGet("campaign/{campaignId:guid}")]
     public async Task<IActionResult> GetByCampaignId(Guid campaignId, CancellationToken ct)
     {

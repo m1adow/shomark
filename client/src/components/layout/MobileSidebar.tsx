@@ -4,7 +4,6 @@ import { NavLink } from 'react-router-dom';
 const navItems = [
   { label: 'Dashboard', icon: 'pi pi-th-large', to: '/' },
   { label: 'Campaigns', icon: 'pi pi-megaphone', to: '/campaigns' },
-  { label: 'Analytics', icon: 'pi pi-chart-bar', to: '/analytics' },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings' },
 ] as const;
 

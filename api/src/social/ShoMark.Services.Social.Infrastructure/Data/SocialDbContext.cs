@@ -8,7 +8,6 @@ public class SocialDbContext : DbContext
     public SocialDbContext(DbContextOptions<SocialDbContext> options) : base(options) { }
 
     public DbSet<Post> Posts => Set<Post>();
-    public DbSet<Analytics> Analytics => Set<Analytics>();
     public DbSet<Platform> Platforms => Set<Platform>();
     public DbSet<FragmentProjection> FragmentProjections => Set<FragmentProjection>();
 

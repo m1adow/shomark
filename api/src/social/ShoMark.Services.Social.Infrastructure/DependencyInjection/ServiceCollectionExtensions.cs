@@ -28,7 +28,6 @@ public static class ServiceCollectionExtensions
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
         services.AddScoped<IPostRepository, PostRepository>();
-        services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
         services.AddScoped<IPlatformRepository, PlatformRepository>();
         services.AddScoped<IFragmentProjectionRepository, FragmentProjectionRepository>();
 
@@ -89,7 +88,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddSocialApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<IPostService, PostService>();
-        services.AddScoped<IAnalyticsService, AnalyticsService>();
         services.AddScoped<IPlatformService, PlatformService>();
         services.AddScoped<IOAuthService, OAuthService>();
         services.AddScoped<IPostPublishingService, PostPublishingService>();

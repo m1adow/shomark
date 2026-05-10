@@ -1,15 +1,9 @@
-import { get, put } from './client';
-import type { AnalyticsDto, CampaignAnalyticsDto, UpdateAnalyticsRequest } from './types';
+import { get } from './client';
+import type { CampaignAnalyticsDto } from './types';
 
 const PATH = '/analytics';
 
 export const analyticsApi = {
-  getByPostId: (postId: string, signal?: AbortSignal) =>
-    get<AnalyticsDto>(`${PATH}/post/${postId}`, signal),
-
-  upsert: (postId: string, req: UpdateAnalyticsRequest, signal?: AbortSignal) =>
-    put<AnalyticsDto>(`${PATH}/post/${postId}`, req, signal),
-
   getCampaignAnalytics: (campaignId: string, signal?: AbortSignal) =>
     get<CampaignAnalyticsDto>(`${PATH}/campaigns/${campaignId}`, signal),
 };

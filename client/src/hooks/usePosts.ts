@@ -24,13 +24,6 @@ export function usePostsByStatus(status: PostStatus) {
   );
 }
 
-export function usePostWithAnalytics(id: string) {
-  return useApiQuery(
-    (signal) => postsApi.getWithAnalytics(id, signal),
-    [id],
-  );
-}
-
 export function useCreatePost() {
   return useApiMutation(
     useCallback((req: CreatePostRequest) => postsApi.create(req), []),

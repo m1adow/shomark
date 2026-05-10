@@ -27,35 +27,6 @@ export const PostStatus = {
 } as const;
 export type PostStatus = (typeof PostStatus)[keyof typeof PostStatus];
 
-// ── Analytics ────────────────────────────────────────────────────────────────
-
-export interface AnalyticsDto {
-  id: string;
-  postId: string;
-  views: number;
-  likes: number;
-  shares: number;
-  comments: number;
-  lastSyncedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface UpdateAnalyticsRequest {
-  views: number;
-  likes: number;
-  shares: number;
-  comments: number;
-}
-
-export interface AnalyticsSummaryDto {
-  views: number;
-  likes: number;
-  shares: number;
-  comments: number;
-  lastSyncedAt: string | null;
-}
-
 // ── Campaign Analytics ────────────────────────────────────────────────────────
 
 export interface CampaignAnalyticsSummaryDto {
@@ -267,21 +238,6 @@ export interface UpdatePostRequest {
   status?: PostStatus;
   scheduledAt?: string;
   publishedAt?: string;
-}
-
-export interface PostWithAnalyticsDto {
-  id: string;
-  fragmentId: string;
-  platformId: string;
-  campaignId: string | null;
-  title: string | null;
-  content: string | null;
-  externalUrl: string | null;
-  status: string;
-  scheduledAt: string | null;
-  publishedAt: string | null;
-  createdAt: string;
-  analytics: AnalyticsSummaryDto | null;
 }
 
 // ── Videos ───────────────────────────────────────────────────────────────────

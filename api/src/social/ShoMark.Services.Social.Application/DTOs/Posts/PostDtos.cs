@@ -31,24 +31,3 @@ public record UpdatePostRequest(
     PostStatus? Status,
     DateTime? ScheduledAt,
     DateTime? PublishedAt);
-
-public record PostWithAnalyticsDto(
-    Guid Id,
-    Guid FragmentId,
-    Guid PlatformId,
-    Guid? CampaignId,
-    string? Title,
-    string? Content,
-    string? ExternalUrl,
-    string Status,
-    DateTime? ScheduledAt,
-    DateTime? PublishedAt,
-    DateTime CreatedAt,
-    AnalyticsSummaryDto? Analytics);
-
-public record AnalyticsSummaryDto(
-    long Views,
-    long Likes,
-    long Shares,
-    long Comments,
-    DateTime? LastSyncedAt);

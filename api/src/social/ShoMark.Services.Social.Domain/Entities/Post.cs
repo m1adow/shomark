@@ -22,5 +22,4 @@ public class Post : BaseEntity
 
     // Navigation
     public Platform Platform { get; set; } = null!;
-    public Analytics? Analytics { get; set; }
 }

@@ -3,7 +3,6 @@ import type {
   PostDto,
   CreatePostRequest,
   UpdatePostRequest,
-  PostWithAnalyticsDto,
 } from './types';
 import type { PostStatus } from './types';
 
@@ -18,9 +17,6 @@ export const postsApi = {
 
   getByStatus: (status: PostStatus, signal?: AbortSignal) =>
     get<PostDto[]>(`${PATH}/status/${status}`, signal),
-
-  getWithAnalytics: (id: string, signal?: AbortSignal) =>
-    get<PostWithAnalyticsDto>(`${PATH}/${id}/analytics`, signal),
 
   create: (req: CreatePostRequest, signal?: AbortSignal) =>
     post<PostDto>(PATH, req, signal),
