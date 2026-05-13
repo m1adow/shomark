@@ -12,16 +12,19 @@ builder.Services.AddSocialInfrastructure(builder.Configuration);
 builder.Services.AddSocialApplicationServices();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserAccessor, TrustedHeaderCurrentUserAccessor>();
+builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<SocialDbContext>();
     await db.Database.EnsureCreatedAsync();
+}
 
+if (app.Environment.IsDevelopment())
+{
     app.MapOpenApi();
     app.MapScalarApiReference(options => options.WithTitle("ShoMark Social API"));
 }
@@ -44,6 +47,7 @@ app.Use(async (context, next) =>
 });
 
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.Run();
 

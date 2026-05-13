@@ -18,22 +18,20 @@ except ImportError:
     cv2 = None  # type: ignore
     _cv2_available = False
 
-_mediapipe_available = False
-try:
-    import mediapipe as _mp
-    # Verify the solutions.face_detection API is present.
-    # It was removed in MediaPipe >= 0.10.x; accessing it here raises AttributeError
-    # on those versions so we disable the boost rather than crashing at runtime.
-    _ = _mp.solutions.face_detection
-    _mediapipe_available = True
-except ImportError:
-    logger.info("MediaPipe not installed — face-detection boost disabled")
-except AttributeError:
-    logger.warning(
-        "MediaPipe is installed but mp.solutions.face_detection is not available "
-        "(MediaPipe >= 0.10 removed the solutions API). "
-        "Install mediapipe<0.11 or disable face detection. Falling back to saliency-only."
-    )
+_face_detection_available = False
+_face_cascade = None
+if _cv2_available:
+    try:
+        _cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        )
+        if _cascade.empty():
+            logger.warning("Haar cascade XML not found — face-detection boost disabled")
+        else:
+            _face_cascade = _cascade
+            _face_detection_available = True
+    except Exception as _exc:
+        logger.warning("OpenCV face detection unavailable — falling back to saliency-only: %s", _exc)
 
 
 class Reframer:
@@ -74,7 +72,7 @@ class Reframer:
         self._dead_zone_pct: float = config.reframer_dead_zone_pct
         self._scene_threshold: float = config.reframer_scene_cut_threshold
         self._face_sigma_pct: float = config.reframer_face_boost_sigma_pct
-        self._enable_face: bool = config.reframer_enable_face_detection and _mediapipe_available
+        self._enable_face: bool = config.reframer_enable_face_detection and _face_detection_available
         self._cache_enabled: bool = config.reframer_cache_enabled
         self._cache_bucket: str = config.cache_bucket
         self._storage = storage
@@ -182,13 +180,7 @@ class Reframer:
 
         saliency_algo = cv2.saliency.StaticSaliencyFineGrained_create()
 
-        face_detector = None
-        if self._enable_face:
-            import mediapipe as mp  # noqa: PLC0415
-
-            face_detector = mp.solutions.face_detection.FaceDetection(
-                model_selection=0, min_detection_confidence=0.5
-            )
+        face_detector = _face_cascade if self._enable_face else None
 
         raw_points: list[tuple[float, int]] = []
         scene_cuts: set[int] = set()
@@ -212,16 +204,16 @@ class Reframer:
                         else np.ones((frame_h, frame_w), dtype=np.float32)
                     )
 
-                    # Optional face-detection boost
+                    # Optional face-detection boost (OpenCV Haar cascade)
                     if face_detector is not None:
-                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        results = face_detector.process(rgb)
-                        if results.detections:
-                            for det in results.detections:
-                                bbox = det.location_data.relative_bounding_box
-                                cx = int((bbox.xmin + bbox.width / 2) * frame_w)
-                                cy = int((bbox.ymin + bbox.height / 2) * frame_h)
-                                sal = self._add_gaussian_boost(sal, cx, cy, face_sigma_px)
+                        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                        faces = face_detector.detectMultiScale(
+                            gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+                        )
+                        for (x_f, y_f, w_f, h_f) in faces:
+                            cx = int(x_f + w_f / 2)
+                            cy = int(y_f + h_f / 2)
+                            sal = self._add_gaussian_boost(sal, cx, cy, face_sigma_px)
 
                     # Best crop window x
                     energy: np.ndarray = sal.sum(axis=0)
@@ -242,8 +234,6 @@ class Reframer:
                 frame_no += 1
         finally:
             cap.release()
-            if face_detector is not None:
-                face_detector.close()
 
         if not raw_points:
             return [(0.0, x_default)]

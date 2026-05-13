@@ -91,6 +91,14 @@ services:
       - Minio__SecretKey=${MINIO_ROOT_PASSWORD:-password123}
       - Minio__Secure=false
       - Minio__PublicEndpoint=localhost:${MINIO_API_PORT:-9000}
+    volumes:
+      - shomark_dp_keys:/data-protection-keys
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   notification-api:
     build:
@@ -129,6 +137,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_started
+      social-api:
+        condition: service_healthy
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_HTTP_PORTS=8080
@@ -138,3 +148,9 @@ services:
       - Kafka__BootstrapServers=kafka:29092
       - Kafka__PlatformTokenExpiredTopic=platform-token-expired
       - Kafka__ConsumerGroupId=analytics-api-group
+    volumes:
+      - shomark_dp_keys:/data-protection-keys
+
+volumes:
+  shomark_dp_keys:
+    name: shomark_dp_keys

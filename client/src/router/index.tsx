@@ -2,6 +2,8 @@ import { createBrowserRouter } from 'react-router-dom';
 import AppLayout from '../components/layout/AppLayout';
 import DashboardPage from '../pages/DashboardPage';
 import CampaignsPage from '../pages/CampaignsPage';
+import CampaignDetailsPage from '../pages/CampaignDetailsPage';
+import CreateCampaignPage from '../pages/create-campaign/CreateCampaignPage';
 import SettingsPage from '../pages/SettingsPage';
 import OAuthCallbackPage from '../pages/OAuthCallbackPage';
 
@@ -32,6 +34,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/campaigns/:id',
+
     element: (
       <AppLayout>
         <CampaignDetailsPage />
