@@ -105,6 +105,8 @@ function VideoPlayer({ url }: { url: string | null }) {
         <motion.video
           src={url}
           controls
+          autoPlay
+          muted
           className="absolute inset-0 w-full h-full object-contain bg-black"
           onLoadedData={() => setVideoReady(true)}
           initial={{ opacity: 0 }}

@@ -15,8 +15,9 @@ public class CampaignDbContext : DbContext
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CampaignDbContext).Assembly);
 
-        // Global query filter for soft-deleted videos
+        // Global query filters for soft-deleted videos (both sides must match)
         modelBuilder.Entity<Video>().HasQueryFilter(v => v.DeletedAt == null);
+        modelBuilder.Entity<AiFragment>().HasQueryFilter(f => f.Video.DeletedAt == null);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

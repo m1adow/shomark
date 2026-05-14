@@ -3,5 +3,4 @@ requests
 confluent-kafka
 minio
 opencv-contrib-python
-mediapipe>=0.9,<0.11
 numpy

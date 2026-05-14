@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -26,13 +27,11 @@ public static class ServiceCollectionExtensions
             options.UseNpgsql(configuration.GetConnectionString("CampaignsConnection"))
                    .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
 
-        // Shared Data Protection key ring stored in social_db — must use the same
-        // application name as the Social service so tokens encrypted there can be decrypted here.
-        services.AddDbContext<DataProtectionKeysContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("SocialConnection")));
+        // Shared Data Protection key ring — must use the same application name as the
+        // Social service so tokens encrypted there can be decrypted here.
         services.AddDataProtection()
             .SetApplicationName("ShoMark.Social")
-            .PersistKeysToDbContext<DataProtectionKeysContext>();
+            .PersistKeysToFileSystem(new DirectoryInfo("/data-protection-keys"));
 
         services.Configure<KafkaOptions>(configuration.GetSection(KafkaOptions.SectionName));
         services.AddSingleton<IKafkaEventPublisher, KafkaEventPublisher>();
