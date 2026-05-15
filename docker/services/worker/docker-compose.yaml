@@ -15,6 +15,8 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - KAFKA_TOPIC=video-processing
       - KAFKA_COMPLETION_TOPIC=video-processing-completed
+      - KAFKA_TRANSCRIPTION_TOPIC=video-transcription
+      - KAFKA_SUMMARIZATION_TOPIC=video-summarization-completed
       - KAFKA_GROUP_ID=worker-group
       - KAFKA_MAX_POLL_INTERVAL_MS=1800000   # 30 minutes — enough for long videos
       - KAFKA_SESSION_TIMEOUT_MS=60000        # 60 seconds heartbeat timeout
@@ -25,6 +27,7 @@ services:
       # Ollama
       - OLLAMA_URL=http://ollama:11434/api/generate
       - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4:e4b}
+      - OLLAMA_SUMMARY_MODEL=qwen3.5:0.8b
       - OLLAMA_TIMEOUT=300
       - OLLAMA_NUM_PREDICT=1024
       # Whisper GPU

@@ -40,6 +40,8 @@ services:
         for topic in \
           video-processing \
           video-processing-completed \
+          video-transcription \
+          video-summarization-completed \
           video-processing-succeeded \
           fragment-approved \
           campaign-status-changed \
@@ -63,6 +65,8 @@ services:
           topics=$$(/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list 2>/dev/null) &&
           echo "$$topics" | grep -Fx video-processing >/dev/null &&
           echo "$$topics" | grep -Fx video-processing-completed >/dev/null &&
+          echo "$$topics" | grep -Fx video-transcription >/dev/null &&
+          echo "$$topics" | grep -Fx video-summarization-completed >/dev/null &&
           echo "$$topics" | grep -Fx video-processing-succeeded >/dev/null &&
           echo "$$topics" | grep -Fx fragment-approved >/dev/null &&
           echo "$$topics" | grep -Fx campaign-status-changed >/dev/null &&

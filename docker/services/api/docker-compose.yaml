@@ -46,6 +46,8 @@ services:
       - Kafka__BootstrapServers=kafka:29092
       - Kafka__VideoProcessingTopic=video-processing
       - Kafka__CompletionTopic=video-processing-completed
+      - Kafka__VideoTranscriptionTopic=video-transcription
+      - Kafka__SummarizationCompletedTopic=video-summarization-completed
       - Kafka__VideoProcessingSucceededTopic=video-processing-succeeded
       - Kafka__FragmentApprovedTopic=fragment-approved
       - Kafka__CampaignStatusChangedTopic=campaign-status-changed

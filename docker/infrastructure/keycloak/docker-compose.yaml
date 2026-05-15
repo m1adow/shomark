@@ -12,6 +12,8 @@ services:
       KC_DB_PASSWORD: ${KC_DB_PASSWORD:-postgres}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./themes:/opt/keycloak/themes
     depends_on:
       - postgres
     restart: always
