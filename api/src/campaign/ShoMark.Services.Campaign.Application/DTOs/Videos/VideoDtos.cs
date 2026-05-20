@@ -7,6 +7,7 @@ public record VideoDto(
     string? OriginalFileName,
     double? DurationSeconds,
     long? FileSize,
+    string? Summary,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 

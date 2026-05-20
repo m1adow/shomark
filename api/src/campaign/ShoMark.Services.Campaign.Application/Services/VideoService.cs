@@ -13,6 +13,7 @@ public class VideoService : IVideoService
     private readonly IVideoRepository _videoRepository;
     private readonly IAiFragmentRepository _fragmentRepository;
     private readonly IVideoProcessingProducer _processingProducer;
+    private readonly IVideoTranscriptionProducer _transcriptionProducer;
     private readonly IStorageService _storageService;
     private readonly StorageOptions _storageOptions;
 
@@ -20,12 +21,14 @@ public class VideoService : IVideoService
         IVideoRepository videoRepository,
         IAiFragmentRepository fragmentRepository,
         IVideoProcessingProducer processingProducer,
+        IVideoTranscriptionProducer transcriptionProducer,
         IStorageService storageService,
         IOptions<StorageOptions> storageOptions)
     {
         _videoRepository = videoRepository;
         _fragmentRepository = fragmentRepository;
         _processingProducer = processingProducer;
+        _transcriptionProducer = transcriptionProducer;
         _storageService = storageService;
         _storageOptions = storageOptions.Value;
     }
@@ -157,6 +160,10 @@ public class VideoService : IVideoService
         };
 
         var created = await _videoRepository.AddAsync(video, ct);
+
+        // Phase 1: auto-trigger transcription + summarization in the background
+        await _transcriptionProducer.SendTranscriptionRequestAsync(bucket, key, ct);
+
         return Result<VideoDto>.Success(created.ToDto());
     }
 

@@ -26,10 +26,10 @@ services:
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-password123}
       # Ollama
       - OLLAMA_URL=http://ollama:11434/api/generate
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4:e4b}
-      - OLLAMA_SUMMARY_MODEL=qwen3.5:0.8b
-      - OLLAMA_TIMEOUT=300
-      - OLLAMA_NUM_PREDICT=1024
+      - OLLAMA_MODEL
+      - OLLAMA_SUMMARY_MODEL
+      - OLLAMA_TIMEOUT=600
+      - OLLAMA_NUM_PREDICT=4096
       # Whisper GPU
       - WHISPER_DEVICE=cuda
       - WHISPER_COMPUTE_TYPE=float16

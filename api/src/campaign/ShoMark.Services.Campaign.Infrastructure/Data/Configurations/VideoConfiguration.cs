@@ -18,6 +18,7 @@ public class VideoConfiguration : IEntityTypeConfiguration<Video>
         builder.Property(v => v.DurationSeconds).HasColumnName("duration_seconds");
         builder.Property(v => v.FileSize).HasColumnName("file_size");
         builder.Property(v => v.DeletedAt).HasColumnName("deleted_at");
+        builder.Property(v => v.Summary).HasColumnName("summary").HasMaxLength(2000);
         builder.Property(v => v.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
         builder.Property(v => v.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
 

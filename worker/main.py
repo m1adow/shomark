@@ -39,6 +39,7 @@ def main() -> None:
         highlight_finder=highlight_finder,
         video_processor=video_processor,
         config=config,
+        llm=llm,
     )
 
     # Producer (completion events)

@@ -249,6 +249,7 @@ export interface VideoDto {
   originalFileName: string | null;
   durationSeconds: number | null;
   fileSize: number | null;
+  summary: string | null;
   createdAt: string;
   updatedAt: string;
 }

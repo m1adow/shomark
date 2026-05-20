@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class VideoConsumer:
-    """Kafka consumer that listens for video-processing tasks.
+    """Kafka consumer that listens for video-processing and video-transcription tasks.
 
     Messages are dispatched to a thread pool so up to ``worker_concurrency``
     jobs run in parallel (vertical scaling).  The ``confluent_kafka.Consumer``
@@ -28,7 +28,8 @@ class VideoConsumer:
     def __init__(self, config: Config, service: VideoHighlightService, producer: EventProducer) -> None:
         self._service = service
         self._producer = producer
-        self._topic = config.kafka_topic
+        self._processing_topic = config.kafka_topic
+        self._transcription_topic = config.kafka_transcription_topic
         self._max_workers = config.worker_concurrency
         self._consumer = Consumer({
             "bootstrap.servers": config.kafka_bootstrap_servers,
@@ -40,11 +41,11 @@ class VideoConsumer:
         })
 
     def run(self) -> None:
-        """Subscribe to the topic and process messages concurrently."""
-        self._consumer.subscribe([self._topic])
+        """Subscribe to both topics and process messages concurrently."""
+        self._consumer.subscribe([self._processing_topic, self._transcription_topic])
         logger.info(
-            "Subscribed to topic: %s — waiting for messages… (concurrency=%d)",
-            self._topic, self._max_workers,
+            "Subscribed to topics: %s, %s — waiting for messages… (concurrency=%d)",
+            self._processing_topic, self._transcription_topic, self._max_workers,
         )
 
         done_queue: queue.SimpleQueue = queue.SimpleQueue()
@@ -105,10 +106,18 @@ class VideoConsumer:
         """
         try:
             value = json.loads(msg.value().decode("utf-8"))
-            logger.info("Received message: %s", json.dumps(value, ensure_ascii=False))
-            result = self._service.process(value)
-            if result:
-                self._producer.send_completion(result)
+            topic = msg.topic()
+            logger.info("Received message from topic '%s': %s", topic, json.dumps(value, ensure_ascii=False))
+
+            if topic == self._transcription_topic:
+                result = self._service.transcribe_and_summarize(value)
+                if result:
+                    self._producer.send_summarization_result(result)
+            else:
+                result = self._service.process(value)
+                if result:
+                    self._producer.send_completion(result)
+
             done_queue.put((msg, True))
         except json.JSONDecodeError:
             logger.error("Invalid JSON in message: %s", msg.value())

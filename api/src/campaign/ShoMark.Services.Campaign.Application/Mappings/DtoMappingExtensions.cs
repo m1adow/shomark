@@ -9,7 +9,7 @@ public static class DtoMappingExtensions
 {
     public static VideoDto ToDto(this Video v) => new(
         v.Id, v.Title, v.StorageKey, v.OriginalFileName,
-        v.DurationSeconds, v.FileSize, v.CreatedAt, v.UpdatedAt);
+        v.DurationSeconds, v.FileSize, v.Summary, v.CreatedAt, v.UpdatedAt);
 
     public static CampaignDto ToDto(this Campaign c) => new(
         c.Id, c.UserId, c.FragmentId, c.VideoId, c.Name,

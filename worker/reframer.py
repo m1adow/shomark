@@ -1,4 +1,4 @@
-import hashlib
+﻿import hashlib
 import logging
 import os
 import subprocess
@@ -26,38 +26,49 @@ if _cv2_available:
             cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
         )
         if _cascade.empty():
-            logger.warning("Haar cascade XML not found — face-detection boost disabled")
+            logger.warning("Haar cascade XML not found — face-detection disabled")
         else:
             _face_cascade = _cascade
             _face_detection_available = True
     except Exception as _exc:
-        logger.warning("OpenCV face detection unavailable — falling back to saliency-only: %s", _exc)
+        logger.warning("OpenCV face detection unavailable: %s", _exc)
 
 
 class Reframer:
-    """Saliency-based dynamic 9:16 reframing for highlight clips.
+    """Conference-aware dynamic 9:16 reframing for highlight clips.
 
-    Replaces the static center-crop in VideoProcessor with a two-step pipeline:
+    Designed for side-by-side online conference recordings where one half of
+    the frame is a screenshare/presentation and the other half is a speaker
+    webcam.  Three-phase pipeline:
 
-    1. **Trajectory computation** — sample frames at *sample_fps*; for each
-       frame build a per-row saliency map (OpenCV ``StaticSaliencyFineGrained``)
-       optionally boosted by a Gaussian at detected face centres (MediaPipe).
-       Project the 2-D map to a 1-D horizontal energy profile and slide a
-       9:16-wide window to find the crop x that maximises interest.  Detect
-       scene cuts via HSV-histogram chi-square distance and snap hard at those
-       boundaries; between cuts, apply EMA smoothing with a dead-zone to
-       suppress micro-jitter.
+    1. **Layout detection** — analyses the first N frames to locate the
+       vertical split between the screenshare and speaker regions.  Temporal
+       column variance finds the boundary; face detection confirms which side
+       holds the speaker.
 
-    2. **Render** — write an FFmpeg ``sendcmd`` script that drives the ``crop``
-       filter's *x* parameter frame-by-frame, then re-encode using the
+    2. **Trajectory computation** — samples frames at *sample_fps*.  For each
+       frame:
+
+       - Screenshare activity = Canny edge density > threshold OR
+         frame-to-frame motion > threshold.
+       - Speaker activity = face detected in the speaker region.
+
+       An asymmetric state machine decides the target crop region: switch TO
+       screenshare after *switch_to_screen_dwell* seconds of screenshare
+       activity; switch AWAY only after *switch_from_screen_dwell* seconds of
+       inactivity with an active speaker.  Priority: screenshare > speaker.
+       Fallback when neither signal is active: hold last position.  EMA
+       smoothing produces fluid panning between the two regions.
+
+    3. **Render** — writes an FFmpeg ``sendcmd`` script that drives the
+       ``crop`` filter's *x* parameter per frame, then re-encodes using the
        configured encoder (``libx264`` default; ``h264_nvenc`` opt-in with
-       automatic fallback to ``libx264`` when NVENC is not compiled in).
+       automatic fallback).
 
     Trajectory cache (opt-in via ``reframer_cache_enabled``) stores the
-    computed ``[[t, x], …]`` trajectory to MinIO under ``trajectories/`` inside
-    the existing ``cache_bucket``, keyed by SHA-256 of the clip content hash
-    combined with all analysis settings (encoder is excluded — the trajectory is
-    encoder-agnostic).
+    computed trajectory to MinIO under ``trajectories/`` inside the existing
+    ``cache_bucket``, keyed by SHA-256 of the clip content hash combined with
+    all analysis settings.
     """
 
     def __init__(self, config, storage=None) -> None:  # noqa: ANN001
@@ -70,13 +81,20 @@ class Reframer:
         self._sample_fps: float = config.reframer_sample_fps
         self._alpha: float = config.reframer_smoothing_alpha
         self._dead_zone_pct: float = config.reframer_dead_zone_pct
-        self._scene_threshold: float = config.reframer_scene_cut_threshold
-        self._face_sigma_pct: float = config.reframer_face_boost_sigma_pct
-        self._enable_face: bool = config.reframer_enable_face_detection and _face_detection_available
+        self._enable_face: bool = (
+            config.reframer_enable_face_detection and _face_detection_available
+        )
         self._cache_enabled: bool = config.reframer_cache_enabled
         self._cache_bucket: str = config.cache_bucket
         self._storage = storage
         self._encoder: str = self._resolve_encoder(config.reframer_encoder)
+
+        # Conference-mode parameters
+        self._layout_sample_frames: int = config.reframer_layout_sample_frames
+        self._screen_edge_threshold: float = config.reframer_screen_edge_threshold
+        self._screen_motion_threshold: float = config.reframer_screen_motion_threshold
+        self._switch_to_screen_dwell: float = config.reframer_switch_to_screen_dwell
+        self._switch_from_screen_dwell: float = config.reframer_switch_from_screen_dwell
 
     # ------------------------------------------------------------------
     # Public API
@@ -123,7 +141,6 @@ class Reframer:
         if not trajectory:
             trajectory = [(0.0, 0)]
 
-        # Interpolate sparse keyframes → per-output-frame timestamps
         dense = self._interpolate_trajectory(trajectory, output_fps)
 
         cmd_file = input_path + ".crops.cmd"
@@ -158,10 +175,94 @@ class Reframer:
                 os.remove(cmd_file)
 
     # ------------------------------------------------------------------
+    # Layout detection
+    # ------------------------------------------------------------------
+
+    def _detect_layout(
+        self, video_path: str
+    ) -> tuple[tuple[int, int], tuple[int, int]]:
+        """Detect screenshare and speaker regions from the first N frames.
+
+        Returns ``(screen_region, speaker_region)`` where each region is an
+        ``(x_start, x_end)`` pixel range.  Strategy:
+
+        1. Compute per-column temporal variance across the sampled frames.
+           The static vertical divider between the two panes has the lowest
+           variance in the centre of the frame.
+        2. Run face detection on the first 10 frames; the side with more face
+           detections is the speaker; the other side is the screenshare.
+        """
+        cap = cv2.VideoCapture(video_path)
+        frame_w: int = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frames: list[np.ndarray] = []
+        for _ in range(self._layout_sample_frames):
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frames.append(frame)
+        cap.release()
+
+        if len(frames) < 2:
+            split_x = int(frame_w * 0.7)
+            logger.warning(
+                "Layout detection: too few frames — assuming 70/30 split at x=%d", split_x
+            )
+            return (0, split_x), (split_x, frame_w)
+
+        # Temporal column variance → find the low-variance boundary column
+        gray_frames = [
+            cv2.cvtColor(f, cv2.COLOR_BGR2GRAY).astype(np.float32) for f in frames
+        ]
+        stack = np.stack(gray_frames, axis=0)  # (N, H, W)
+        col_variance = stack.var(axis=0).mean(axis=0)  # (W,)
+
+        # Search only in the central 30–80% of the frame width to avoid edges
+        search_start = int(frame_w * 0.30)
+        search_end = int(frame_w * 0.80)
+        split_x = search_start + int(np.argmin(col_variance[search_start:search_end]))
+
+        logger.info("Layout detection: split_x=%d / frame_w=%d", split_x, frame_w)
+
+        # Face counts per side → determine speaker side
+        face_counts = {"left": 0, "right": 0}
+        if self._enable_face and _face_cascade is not None:
+            for frame in frames[: min(10, len(frames))]:
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                try:
+                    faces = _face_cascade.detectMultiScale(
+                        gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+                    )
+                except cv2.error:
+                    # Known OpenCV bug: vector::_M_range_check on certain frame
+                    # dimensions. Skip this frame and continue with the others.
+                    continue
+                for (x_f, _y_f, w_f, _h_f) in faces:
+                    if x_f + w_f // 2 < split_x:
+                        face_counts["left"] += 1
+                    else:
+                        face_counts["right"] += 1
+
+        # Speaker = side with more faces; screen = the other side
+        if face_counts["left"] >= face_counts["right"]:
+            speaker_region: tuple[int, int] = (0, split_x)
+            screen_region: tuple[int, int] = (split_x, frame_w)
+        else:
+            speaker_region = (split_x, frame_w)
+            screen_region = (0, split_x)
+
+        logger.info(
+            "Layout: screen=%s  speaker=%s  (face_counts=%s)",
+            screen_region, speaker_region, face_counts,
+        )
+        return screen_region, speaker_region
+
+    # ------------------------------------------------------------------
     # Trajectory sampling
     # ------------------------------------------------------------------
 
     def _sample_trajectory(self, video_path: str) -> list[tuple[float, int]]:
+        screen_region, speaker_region = self._detect_layout(video_path)
+
         cap = cv2.VideoCapture(video_path)
         try:
             src_fps: float = cap.get(cv2.CAP_PROP_FPS) or 25.0
@@ -173,19 +274,24 @@ class Reframer:
 
         crop_w = max(1, round(frame_h * 9 / 16))
         x_max = max(0, frame_w - crop_w)
-        x_default = x_max // 2
+
+        screen_center_x = self._region_crop_x(screen_region, crop_w, x_max)
+        speaker_center_x = self._region_crop_x(speaker_region, crop_w, x_max)
 
         step = max(1, round(src_fps / self._sample_fps))
-        face_sigma_px = max(1, round(frame_w * self._face_sigma_pct))
 
-        saliency_algo = cv2.saliency.StaticSaliencyFineGrained_create()
+        # Hysteresis: minimum consecutive samples required before a mode switch
+        switch_to_screen = max(1, round(self._switch_to_screen_dwell * self._sample_fps))
+        switch_from_screen = max(1, round(self._switch_from_screen_dwell * self._sample_fps))
 
-        face_detector = _face_cascade if self._enable_face else None
+        # State machine
+        current_mode = "screen"
+        screen_active_count = 0
+        screen_inactive_count = 0
+        current_x = float(screen_center_x)
 
         raw_points: list[tuple[float, int]] = []
-        scene_cuts: set[int] = set()
-        prev_hist: np.ndarray | None = None
-        idx = 0
+        prev_screen_gray: np.ndarray | None = None
         frame_no = 0
 
         try:
@@ -193,109 +299,107 @@ class Reframer:
                 ret, frame = cap.read()
                 if not ret:
                     break
-                if frame_no % step == 0:
-                    t = frame_no / src_fps
 
-                    # Saliency map
-                    ok, sal_map = saliency_algo.computeSaliency(frame)
-                    sal: np.ndarray = (
-                        sal_map.astype(np.float32)
-                        if ok
-                        else np.ones((frame_h, frame_w), dtype=np.float32)
+                if frame_no % step != 0:
+                    frame_no += 1
+                    continue
+
+                t = frame_no / src_fps
+
+                # --- Screenshare activity: edges OR motion ---
+                sx0, sx1 = screen_region
+                gray_screen = cv2.cvtColor(frame[:, sx0:sx1], cv2.COLOR_BGR2GRAY)
+                edges = cv2.Canny(gray_screen, 50, 150)
+                edge_density = float(edges.mean()) / 255.0
+
+                motion = 0.0
+                if prev_screen_gray is not None:
+                    diff = cv2.absdiff(gray_screen, prev_screen_gray)
+                    motion = float(diff.mean()) / 255.0
+                prev_screen_gray = gray_screen.copy()
+
+                screen_active = (
+                    edge_density > self._screen_edge_threshold
+                    or motion > self._screen_motion_threshold
+                )
+
+                # --- Speaker activity: face present in speaker region ---
+                speaker_active = False
+                if self._enable_face and _face_cascade is not None:
+                    spx0, spx1 = speaker_region
+                    gray_speaker = cv2.cvtColor(
+                        frame[:, spx0:spx1], cv2.COLOR_BGR2GRAY
                     )
+                    min_side = 30
+                    if gray_speaker.shape[0] >= min_side and gray_speaker.shape[1] >= min_side:
+                        try:
+                            faces = _face_cascade.detectMultiScale(
+                                gray_speaker, scaleFactor=1.1, minNeighbors=5, minSize=(min_side, min_side)
+                            )
+                            speaker_active = len(faces) > 0
+                        except cv2.error:
+                            pass
 
-                    # Optional face-detection boost (OpenCV Haar cascade)
-                    if face_detector is not None:
-                        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                        faces = face_detector.detectMultiScale(
-                            gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
-                        )
-                        for (x_f, y_f, w_f, h_f) in faces:
-                            cx = int(x_f + w_f / 2)
-                            cy = int(y_f + h_f / 2)
-                            sal = self._add_gaussian_boost(sal, cx, cy, face_sigma_px)
+                # --- Asymmetric hysteresis counters ---
+                if screen_active:
+                    screen_active_count += 1
+                    screen_inactive_count = 0
+                else:
+                    screen_inactive_count += 1
+                    screen_active_count = 0
 
-                    # Best crop window x
-                    energy: np.ndarray = sal.sum(axis=0)
-                    x = self._best_window_x(energy, crop_w, x_max, x_default)
+                # --- State transitions ---
+                if current_mode == "speaker" and screen_active_count >= switch_to_screen:
+                    current_mode = "screen"
+                    screen_active_count = 0
+                    logger.debug(
+                        "t=%.1f → screen  (edge=%.3f  motion=%.3f)", t, edge_density, motion
+                    )
+                elif (
+                    current_mode == "screen"
+                    and not screen_active
+                    and speaker_active
+                    and screen_inactive_count >= switch_from_screen
+                ):
+                    current_mode = "speaker"
+                    screen_inactive_count = 0
+                    logger.debug("t=%.1f → speaker", t)
 
-                    # Scene cut detection via HSV histogram chi-square
-                    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-                    hist = cv2.calcHist([hsv], [0, 1], None, [30, 32], [0, 180, 0, 256])
-                    cv2.normalize(hist, hist)
-                    if prev_hist is not None:
-                        dist = cv2.compareHist(hist, prev_hist, cv2.HISTCMP_CHISQR)
-                        if dist > self._scene_threshold:
-                            scene_cuts.add(idx)
-                    prev_hist = hist
+                # --- Determine target crop-x ---
+                if current_mode == "screen":
+                    target_x = float(screen_center_x)
+                elif speaker_active:
+                    target_x = float(speaker_center_x)
+                else:
+                    target_x = current_x  # hold last position
 
-                    raw_points.append((t, x))
-                    idx += 1
+                # --- EMA smoothing with dead-zone ---
+                dead_zone = x_max * self._dead_zone_pct
+                if abs(target_x - current_x) > dead_zone:
+                    current_x = self._alpha * target_x + (1.0 - self._alpha) * current_x
+
+                raw_points.append((t, int(round(max(0.0, min(current_x, float(x_max)))))))
                 frame_no += 1
+
         finally:
             cap.release()
 
         if not raw_points:
-            return [(0.0, x_default)]
+            return [(0.0, screen_center_x)]
 
-        return self._smooth(raw_points, x_max, scene_cuts)
+        return raw_points
 
     # ------------------------------------------------------------------
     # Pure helpers (no I/O — easily unit-testable)
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _best_window_x(
-        energy: np.ndarray,
-        crop_w: int,
-        x_max: int,
-        fallback: int,
-    ) -> int:
-        """Slide a window of width *crop_w* and return the left-edge x
-        that maximises the sum of *energy*, clamped to [0, x_max]."""
-        if len(energy) <= crop_w:
-            return fallback
-        cs = np.concatenate(([0.0], np.cumsum(energy)))
-        window_sums = cs[crop_w:] - cs[: len(cs) - crop_w]
-        return min(int(np.argmax(window_sums)), x_max)
-
-    @staticmethod
-    def _add_gaussian_boost(
-        sal: np.ndarray,
-        cx: int,
-        cy: int,
-        sigma: int,
-    ) -> np.ndarray:
-        """Add a unit Gaussian centred at *(cx, cy)* to the saliency map."""
-        h, w = sal.shape[:2]
-        xs = np.arange(w, dtype=np.float32)
-        ys = np.arange(h, dtype=np.float32)
-        xx, yy = np.meshgrid(xs, ys)
-        gauss = np.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2.0 * sigma ** 2))
-        return sal + gauss
-
-    def _smooth(
-        self,
-        raw: list[tuple[float, int]],
-        x_max: int,
-        scene_cuts: set[int],
-    ) -> list[tuple[float, int]]:
-        """EMA smoothing with dead-zone; hard snap at detected scene cuts."""
-        smoothed: list[tuple[float, int]] = []
-        prev_x = float(raw[0][1])
-        dead_zone = x_max * self._dead_zone_pct
-
-        for i, (t, x) in enumerate(raw):
-            if i in scene_cuts:
-                prev_x = float(x)  # hard snap
-            elif abs(x - prev_x) > dead_zone:
-                prev_x = self._alpha * x + (1.0 - self._alpha) * prev_x
-            # else: dead-zone — hold current position
-
-            clamped = int(round(max(0.0, min(prev_x, float(x_max)))))
-            smoothed.append((t, clamped))
-
-        return smoothed
+    def _region_crop_x(region: tuple[int, int], crop_w: int, x_max: int) -> int:
+        """Return the crop left-edge x that centres the 9:16 window on *region*."""
+        r_start, r_end = region
+        region_center = (r_start + r_end) // 2
+        x = region_center - crop_w // 2
+        return int(max(0, min(x, x_max)))
 
     # ------------------------------------------------------------------
     # FFmpeg / sendcmd helpers
@@ -358,16 +462,13 @@ class Reframer:
     # ------------------------------------------------------------------
 
     def _build_cache_key(self, content_hash: str) -> str:
-        """Derive MinIO object key for this clip's trajectory cache.
-
-        The fingerprint includes all analysis settings that affect the
-        trajectory; the encoder is intentionally excluded because the
-        trajectory itself is encoder-agnostic.
-        """
+        """Derive MinIO object key for this clip's trajectory cache."""
         fingerprint = (
             f"{content_hash}:"
             f"{self._sample_fps}:{self._alpha}:{self._dead_zone_pct}:"
-            f"{self._scene_threshold}:{self._face_sigma_pct}:{self._enable_face}"
+            f"{self._screen_edge_threshold}:{self._screen_motion_threshold}:"
+            f"{self._switch_to_screen_dwell}:{self._switch_from_screen_dwell}:"
+            f"{self._layout_sample_frames}:{self._enable_face}"
         )
         digest = hashlib.sha256(fingerprint.encode()).hexdigest()
         return f"trajectories/{digest}.json"
@@ -378,11 +479,7 @@ class Reframer:
 
     @staticmethod
     def _resolve_encoder(requested: str) -> str:
-        """Return the encoder to use.
-
-        Falls back to ``libx264`` with a warning when the requested encoder
-        (e.g. ``h264_nvenc``) is not compiled into the available FFmpeg binary.
-        """
+        """Return the encoder to use, falling back to ``libx264`` if unavailable."""
         if requested == "libx264":
             return "libx264"
         try:

@@ -91,6 +91,36 @@ class StorageClient:
         )
         logger.info("Transcript cache written: %s/%s (%d bytes)", bucket, key, len(payload))
 
+    def load_summary_cache(self, bucket: str, key: str) -> str | None:
+        """Load a cached summary string from MinIO. Returns None on miss/error."""
+        try:
+            if not self._client.bucket_exists(bucket):
+                return None
+            response = self._client.get_object(bucket, key)
+            try:
+                data = response.read().decode("utf-8")
+            finally:
+                response.close()
+                response.release_conn()
+            logger.info("Summary cache HIT: %s/%s", bucket, key)
+            return data
+        except S3Error:
+            return None
+        except Exception as exc:
+            logger.warning("Summary cache load failed (%s/%s): %s", bucket, key, exc)
+            return None
+
+    def save_summary_cache(self, bucket: str, key: str, summary: str) -> None:
+        """Persist a summary string to MinIO as a plain-text object."""
+        if not self._client.bucket_exists(bucket):
+            self._client.make_bucket(bucket)
+        payload = summary.encode("utf-8")
+        self._client.put_object(
+            bucket, key, io.BytesIO(payload), length=len(payload),
+            content_type="text/plain; charset=utf-8",
+        )
+        logger.info("Summary cache written: %s/%s", bucket, key)
+
     # ------------------------------------------------------------------
     # Trajectory cache helpers
     # ------------------------------------------------------------------
