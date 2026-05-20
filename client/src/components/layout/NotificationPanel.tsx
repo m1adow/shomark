@@ -102,7 +102,7 @@ const NotificationPanel = forwardRef<NotificationPanelHandle, NotificationPanelP
               >
                 <button
                   type="button"
-                  className="flex-1 text-left flex items-start gap-3 cursor-pointer hover:bg-gray-50/50 transition-colors -mx-1 px-1 rounded"
+                  className="flex-1 text-left flex items-start gap-3 cursor-pointer hover:bg-gray-50/50 transition-colors -mx-1 px-1 pr-6 rounded"
                   onClick={() => handleClick(n)}
                 >
                   <i className={`${typeIcon(n.type)} ${typeColor(n.type)} text-lg mt-0.5`} />
@@ -126,7 +126,7 @@ const NotificationPanel = forwardRef<NotificationPanelHandle, NotificationPanelP
                 <button
                   type="button"
                   aria-label="Delete notification"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 mt-0.5 p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 flex-shrink-0"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
                   onClick={() => onDelete(n.id)}
                 >
                   <i className="pi pi-trash text-xs" />

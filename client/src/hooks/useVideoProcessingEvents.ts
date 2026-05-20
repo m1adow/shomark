@@ -8,16 +8,32 @@ interface ProcessingCompleteEvent {
   highlightCount: number;
 }
 
+interface TranscriptionCompleteEvent {
+  videoId: string;
+  summary: string | null;
+}
+
+interface VideoSseCallbacks {
+  onProcessingComplete?: (event: ProcessingCompleteEvent) => void;
+  onTranscriptionComplete?: (event: TranscriptionCompleteEvent) => void;
+}
+
 /**
- * Hook that subscribes to SSE events for video processing completion.
+ * Hook that subscribes to SSE events for video processing.
+ * Handles both "processing-complete" (Phase 2) and "transcription-complete" (Phase 1).
  * Automatically reconnects on errors. Cleans up on unmount.
  */
 export function useVideoProcessingEvents(
   videoId: string | null,
-  onComplete: (event: ProcessingCompleteEvent) => void,
+  callbacksOrOnComplete: VideoSseCallbacks | ((event: ProcessingCompleteEvent) => void),
 ) {
-  const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  // Normalise: accept either the new callbacks object or the legacy single function
+  const callbacks: VideoSseCallbacks = typeof callbacksOrOnComplete === 'function'
+    ? { onProcessingComplete: callbacksOrOnComplete }
+    : callbacksOrOnComplete;
+
+  const callbacksRef = useRef(callbacks);
+  callbacksRef.current = callbacks;
 
   useEffect(() => {
     if (!videoId) return;
@@ -31,28 +47,30 @@ export function useVideoProcessingEvents(
       const tokenProvider = getTokenProvider();
       const token = tokenProvider?.();
 
-      // EventSource doesn't support Authorization headers natively,
-      // so we pass the token as a query param. The backend reads it
-      // from the query string if the Authorization header is absent.
       const url = `${BASE}/videos/${videoId}/events${token ? `?access_token=${token}` : ''}`;
-
       es = new EventSource(url);
 
       es.addEventListener('processing-complete', (e) => {
         try {
           const data = JSON.parse(e.data) as ProcessingCompleteEvent;
-          onCompleteRef.current(data);
+          callbacksRef.current.onProcessingComplete?.(data);
+        } catch {
+          // Malformed event — ignore
+        }
+      });
+
+      es.addEventListener('transcription-complete', (e) => {
+        try {
+          const data = JSON.parse(e.data) as TranscriptionCompleteEvent;
+          callbacksRef.current.onTranscriptionComplete?.(data);
         } catch {
           // Malformed event — ignore
         }
       });
 
       es.onerror = () => {
-        // Browser auto-reconnects for most errors.
-        // If the connection is fully closed, fall through.
         if (es?.readyState === EventSource.CLOSED) {
           es.close();
-          // Retry after 5 seconds
           if (!cancelled) {
             setTimeout(connect, 5000);
           }

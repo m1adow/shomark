@@ -12,6 +12,7 @@ from storage import StorageClient
 from transcriber import Transcriber
 from highlight_finder import HighlightFinder
 from video_processor import VideoProcessor
+from llm import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +35,17 @@ class VideoHighlightService:
         highlight_finder: HighlightFinder,
         video_processor: VideoProcessor,
         config: Config,
+        llm: LLMClient | None = None,
+        llm_summary: LLMClient | None = None,
     ) -> None:
         self._storage = storage
         self._transcriber = transcriber
         self._highlight_finder = highlight_finder
         self._video_processor = video_processor
+        self._llm = llm
+        # Separate (potentially lighter) client used only for Phase-1 summary.
+        # Falls back to the main LLM client if not provided.
+        self._llm_summary = llm_summary or llm
         self._cache_bucket = config.cache_bucket
         self._cache_enabled = config.cache_enabled
         self._whisper_fingerprint = (
@@ -63,7 +70,7 @@ class VideoHighlightService:
         output_prefix = message.get("output_prefix", "")
         target_audience = message.get("target_audience")
         description = message.get("description")
-        additional_instructions = message.get("additional_instructions")
+        additional_instructions = message.get("additional_instructions") or None
         exclude_ranges: list[dict] | None = message.get("exclude_ranges") or None
 
         work_dir = f"/tmp/work/{uuid.uuid4().hex}"
@@ -206,3 +213,71 @@ class VideoHighlightService:
             if seg["end"] > start and seg["start"] < end
         ]
         return " ".join(parts)
+
+    def transcribe_and_summarize(self, message: dict) -> dict | None:
+        """Phase 1 pipeline: download → transcribe → summarize.
+
+        Returns a result dict for video-summarization-completed, or None on error.
+        """
+        video_bucket = message["video_bucket"]
+        video_key = message["video_key"]
+
+        work_dir = f"/tmp/work/{uuid.uuid4().hex}"
+        local_video = os.path.join(work_dir, "source.mp4")
+
+        timings: dict[str, float] = {}
+        t_start = time.perf_counter()
+
+        try:
+            logger.info("=== [Phase 1] Downloading video ===")
+            t0 = time.perf_counter()
+            self._storage.download_video(video_bucket, video_key, local_video)
+            timings["download"] = time.perf_counter() - t0
+
+            logger.info("=== [Phase 1] Transcribing ===")
+            t0 = time.perf_counter()
+            cache_key: str | None = None
+            segments: list[dict] | None = None
+            if self._cache_enabled:
+                cache_key = self._build_cache_key(local_video)
+                segments = self._storage.load_transcript_cache(self._cache_bucket, cache_key)
+            if segments is not None:
+                logger.info("[Phase 1] Transcript cache HIT — Whisper skipped")
+            else:
+                segments = self._transcriber.transcribe(local_video)
+                if self._cache_enabled and cache_key is not None:
+                    self._storage.save_transcript_cache(self._cache_bucket, cache_key, segments)
+            timings["transcribe"] = time.perf_counter() - t0
+
+            logger.info("=== [Phase 1] Summarizing transcript ===")
+            t0 = time.perf_counter()
+            summary = ""
+            summary_cache_key = (cache_key + ":summary") if cache_key else None
+            if self._cache_enabled and summary_cache_key:
+                cached = self._storage.load_summary_cache(self._cache_bucket, summary_cache_key)
+                if cached is not None:
+                    summary = cached
+                    logger.info("[Phase 1] Summary cache HIT — LLM skipped")
+            if not summary and self._llm_summary is not None:
+                summary = self._llm_summary.summarize(segments)
+                if self._cache_enabled and summary_cache_key and summary:
+                    self._storage.save_summary_cache(self._cache_bucket, summary_cache_key, summary)
+            timings["summarize"] = time.perf_counter() - t0
+
+            total = time.perf_counter() - t_start
+            logger.info(
+                "=== [Phase 1] TIMING [%s]: %s | total=%.1fs ===",
+                video_key,
+                " ".join(f"{k}={v:.1f}s" for k, v in timings.items()),
+                total,
+            )
+
+            return {
+                "video_bucket": video_bucket,
+                "video_key": video_key,
+                "summary": summary,
+            }
+
+        finally:
+            if os.path.exists(work_dir):
+                shutil.rmtree(work_dir, ignore_errors=True)

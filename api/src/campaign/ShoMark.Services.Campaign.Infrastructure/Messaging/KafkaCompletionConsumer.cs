@@ -178,7 +178,7 @@ public class KafkaCompletionConsumer : BackgroundService
             videoId = video.Id,
             highlightCount = highlightsElement.GetArrayLength(),
         });
-        await _notifier.PublishAsync(video.Id, ssePayload);
+        await _notifier.PublishAsync(video.Id, "processing-complete", ssePayload);
 
         var campaigns = await campaignRepo.GetByVideoIdAsync(video.Id, ct);
         foreach (var userId in campaigns.Select(c => c.UserId).Distinct())

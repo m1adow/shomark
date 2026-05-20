@@ -8,6 +8,7 @@ public class Video : BaseEntity
     public double? DurationSeconds { get; set; }
     public long? FileSize { get; set; }
     public DateTime? DeletedAt { get; set; }
+    public string? Summary { get; set; }
 
     // Navigation
     public ICollection<AiFragment> Fragments { get; set; } = [];

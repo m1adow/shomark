@@ -1,20 +1,21 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using ShoMark.Application.Common;
 using ShoMark.Application.Interfaces;
 
 namespace ShoMark.Infrastructure.Messaging;
 
 /// <summary>
-/// In-memory pub/sub for video processing completion events.
-/// Registered as singleton — bridges the Kafka consumer to SSE endpoints.
+/// In-memory pub/sub for video SSE events.
+/// Registered as singleton — bridges Kafka consumers to SSE endpoints.
 /// </summary>
 public class VideoProcessingNotifier : IVideoProcessingNotifier
 {
-    private readonly ConcurrentDictionary<Guid, ConcurrentBag<Channel<string>>> _subscriptions = new();
+    private readonly ConcurrentDictionary<Guid, ConcurrentBag<Channel<SseEvent>>> _subscriptions = new();
 
-    public ChannelReader<string> Subscribe(Guid videoId)
+    public ChannelReader<SseEvent> Subscribe(Guid videoId)
     {
-        var channel = Channel.CreateBounded<string>(new BoundedChannelOptions(16)
+        var channel = Channel.CreateBounded<SseEvent>(new BoundedChannelOptions(16)
         {
             FullMode = BoundedChannelFullMode.DropOldest,
             SingleReader = true,
@@ -27,12 +28,11 @@ public class VideoProcessingNotifier : IVideoProcessingNotifier
         return channel.Reader;
     }
 
-    public void Unsubscribe(Guid videoId, ChannelReader<string> reader)
+    public void Unsubscribe(Guid videoId, ChannelReader<SseEvent> reader)
     {
         if (!_subscriptions.TryGetValue(videoId, out var bag)) return;
 
-        // Rebuild bag without the matching channel
-        var remaining = new ConcurrentBag<Channel<string>>();
+        var remaining = new ConcurrentBag<Channel<SseEvent>>();
         foreach (var ch in bag)
         {
             if (ch.Reader != reader)
@@ -43,18 +43,18 @@ public class VideoProcessingNotifier : IVideoProcessingNotifier
 
         _subscriptions.TryUpdate(videoId, remaining, bag);
 
-        // Clean up empty entries
         if (remaining.IsEmpty)
             _subscriptions.TryRemove(videoId, out _);
     }
 
-    public async Task PublishAsync(Guid videoId, string payload)
+    public async Task PublishAsync(Guid videoId, string eventType, string data)
     {
         if (!_subscriptions.TryGetValue(videoId, out var bag)) return;
 
+        var @event = new SseEvent(eventType, data);
         foreach (var channel in bag)
         {
-            await channel.Writer.WriteAsync(payload);
+            await channel.Writer.WriteAsync(@event);
         }
     }
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+﻿import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Steps } from 'primereact/steps';
 import { Toast } from 'primereact/toast';
@@ -13,13 +13,15 @@ import { useVideoFragments, useUpdateFragment } from '../../hooks/useFragments';
 import { useCreatePost, usePublishPost, useCampaignPosts, useScheduledPostsInRange } from '../../hooks/usePosts';
 import { useMyPlatforms } from '../../hooks/usePlatforms';
 import { useVideoProcessingEvents } from '../../hooks/useVideoProcessingEvents';
-import StepCampaignSetup, { type CampaignSetupData } from './StepCampaignSetup';
+import StepVideoUpload, { type VideoUploadData } from './StepVideoUpload';
+import StepVideoSummarize, { type VideoSummarizeData } from './StepVideoSummarize';
 import StepAiReview from './StepAiReview';
 import StepSchedulePublish from './StepSchedulePublish';
 import type { CampaignDto } from '../../api/types';
 
 const stepItems = [
-  { label: 'Campaign Setup' },
+  { label: 'Upload' },
+  { label: 'Configure' },
   { label: 'AI Review' },
   { label: 'Schedule & Publish' },
 ];
@@ -33,56 +35,67 @@ export default function CreateCampaignPage() {
   const [activeStep, setActiveStep] = useState(0);
   const [draftReady, setDraftReady] = useState(!editId);
 
-  // ── Step 1 state ───────────────────────────────────────────────────────
-  const [setupData, setSetupData] = useState<CampaignSetupData>({
-    name: '',
-    targetAudience: null,
-    description: '',
-    file: null,
-  });
+  // â”€â”€ Step 0 state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [uploadData, setUploadData] = useState<VideoUploadData>({ name: '', file: null });
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [creatingCampaign, setCreatingCampaign] = useState(false);
 
-  // Created campaign reference
+  // â”€â”€ Step 1 state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [summarizeData, setSummarizeData] = useState<VideoSummarizeData>({
+    targetAudience: null,
+    description: '',
+  });
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [processError, setProcessError] = useState<string | null>(null);
+
+  // â”€â”€ Shared â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [campaign, setCampaign] = useState<CampaignDto | null>(null);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [approvedFragmentId, setApprovedFragmentId] = useState<string | null>(null);
 
-  // ── Resume existing draft ──────────────────────────────────────────────
+  // â”€â”€ Resume existing draft â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { data: existingCampaign } = useCampaign(editId ?? '', !!editId);
 
   useEffect(() => {
     if (!existingCampaign) return;
 
     setCampaign(existingCampaign);
-    setSetupData((prev) => ({
+    setUploadData((prev) => ({ ...prev, name: existingCampaign.name ?? '' }));
+    setSummarizeData((prev) => ({
       ...prev,
-      name: existingCampaign.name ?? '',
       description: existingCampaign.description ?? '',
     }));
 
     if (existingCampaign.videoId) {
       setVideoId(existingCampaign.videoId);
-    }
-    if (existingCampaign.fragmentId) {
-      setApprovedFragmentId(existingCampaign.fragmentId);
+      // Fetch summary from video record
+      videosApi.getById(existingCampaign.videoId).then((v) => {
+        if (v.summary) {
+          setSummary(v.summary);
+          setSummaryLoading(false);
+        } else {
+          setSummaryLoading(true); // will update via SSE
+        }
+      }).catch(() => setSummaryLoading(false));
     }
 
-    // Determine latest step.
-    // If videoId exists but no fragmentId, defer draftReady to the fragment
-    // check effect below to avoid a visible step-1 → step-2 transition.
     if (existingCampaign.fragmentId) {
-      setActiveStep(2);
+      setApprovedFragmentId(existingCampaign.fragmentId);
+      setActiveStep(3);
       setDraftReady(true);
     } else if (!existingCampaign.videoId) {
       setActiveStep(0);
       setDraftReady(true);
     }
-    // else: has videoId but no fragmentId → fragment check effect sets draftReady
+    // else: has videoId but no fragmentId â€” fragment check effect sets draftReady
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingCampaign]);
 
-  // ── Mutations ──────────────────────────────────────────────────────────
+  // â”€â”€ Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { execute: createCampaign } = useCreateCampaign();
   const { execute: updateCampaign } = useUpdateCampaign();
   const { execute: uploadVideo } = useUploadVideo();
@@ -91,7 +104,7 @@ export default function CreateCampaignPage() {
   const { execute: publishPost } = usePublishPost();
   const { execute: updateFragment } = useUpdateFragment();
 
-  // ── Step 2 queries (only when videoId is set) ──────────────────────────
+  // â”€â”€ Step 2 queries (only when videoId is set) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const {
     data: fragments,
     loading: fragmentsLoading,
@@ -99,151 +112,165 @@ export default function CreateCampaignPage() {
     refetch: refetchFragments,
   } = useVideoFragments(videoId ?? '', !!videoId);
 
-  // When fragments load and one is already approved, jump to step 2 (new campaign flow).
-  useEffect(() => {
-    if (editId) return; // handled by the draft step-determination effect below
-    if (!fragments || fragments.length === 0) return;
-    const approved = fragments.find((f) => f.isApproved);
-    if (approved && !approvedFragmentId) {
-      setApprovedFragmentId(approved.id);
-      setActiveStep(2);
-    }
-  }, [editId, fragments, approvedFragmentId]);
-
-  // For draft campaigns that have a video but no pre-selected fragment: wait until
-  // fragments are loaded before setting draftReady, so the correct step is shown
-  // immediately without a step-1 → step-2 transition.
+  // For draft campaigns: determine landing step once fragments load
   useEffect(() => {
     if (!editId || !existingCampaign?.videoId || existingCampaign?.fragmentId) return;
     if (fragmentsLoading || fragments === null) return;
+
     const approved = fragments.find((f) => f.isApproved);
     if (approved) {
       setApprovedFragmentId(approved.id);
+      setActiveStep(3);
+    } else if (fragments.length > 0) {
       setActiveStep(2);
     } else {
+      // Phase 2 not yet triggered or still running â†’ land on Configure
       setActiveStep(1);
     }
     setDraftReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, existingCampaign, fragmentsLoading, fragments]);
 
-  // Workaround: useVideoFragments doesn't support enabled, pass videoId conditionally
-  const {
-    data: videoUrlData,
-  } = useVideoUrl(videoId ?? '', !!videoId);
+  // Auto-advance approved fragment in new campaign flow
+  useEffect(() => {
+    if (editId) return;
+    if (!fragments || fragments.length === 0) return;
+    const approved = fragments.find((f) => f.isApproved);
+    if (approved && !approvedFragmentId) {
+      setApprovedFragmentId(approved.id);
+      setActiveStep(3);
+    }
+  }, [editId, fragments, approvedFragmentId]);
+
+  const { data: videoUrlData } = useVideoUrl(videoId ?? '', !!videoId);
 
   const [regenerating, setRegenerating] = useState(false);
 
-  // ── SSE: auto-refetch fragments when worker completes ──────────────────
+  // â”€â”€ SSE: handle both processing-complete and transcription-complete â”€â”€â”€â”€
   useVideoProcessingEvents(
-    activeStep >= 1 ? videoId : null,
-    useCallback(() => {
-      refetchFragments();
-      setRegenerating(false);
-      toast.current?.show({
-        severity: 'success',
-        summary: 'AI Processing Complete',
-        detail: 'Video highlights are ready for review.',
-        life: 4000,
-      });
-    }, [refetchFragments]),
+    videoId,
+    useMemo(() => ({
+      onProcessingComplete: () => {
+        refetchFragments();
+        setRegenerating(false);
+        toast.current?.show({
+          severity: 'success',
+          summary: 'AI Processing Complete',
+          detail: 'Video highlights are ready for review.',
+          life: 4000,
+        });
+      },
+      onTranscriptionComplete: (evt) => {
+        setSummary(evt.summary ?? null);
+        setSummaryLoading(false);
+      },
+    }), [refetchFragments]),
   );
 
-  // ── Step 3 queries ─────────────────────────────────────────────────────
-  const { data: platforms, loading: platformsLoading } = useMyPlatforms();
+  // â”€â”€ Auto-upload when file is selected in step 0 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const uploadTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (!uploadData.file || uploading || uploadTriggeredRef.current) return;
+    uploadTriggeredRef.current = true;
 
-  const {
-    data: campaignPosts,
-  } = useCampaignPosts(campaign?.id ?? '', !!campaign);
-
-  // Scheduled posts for current month
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
-  const { data: scheduledPosts } = useScheduledPostsInRange(monthStart, monthEnd);
-
-  const [publishing, setPublishing] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
-
-  // ── Step 1: Analyze with AI ────────────────────────────────────────────
-  const handleStep1Next = useCallback(async () => {
-    if (!setupData.file) return;
-
+    let uploadedId: string | null = null;
     setUploadError(null);
-
-    // Layer 1: validate name availability before any upload
-    if (setupData.name.trim()) {
-      try {
-        const { isAvailable } = await campaignsApi.checkName(setupData.name.trim());
-        if (!isAvailable) {
-          setUploadError('A campaign with this name already exists. Please choose a different name.');
-          return;
-        }
-      } catch {
-        setUploadError('Could not validate campaign name. Please try again.');
-        return;
-      }
-    }
-
     setUploading(true);
     setUploadProgress(10);
 
-    // Layer 2: track uploaded video id for cleanup on failure
-    let uploadedVideoId: string | null = null;
+    uploadVideo(uploadData.file)
+      .then((video) => {
+        uploadedId = video.id;
+        setVideoId(video.id);
+        setUploadProgress(100);
+        setSummaryLoading(true);
+        // summary will arrive via SSE transcription-complete
+      })
+      .catch((err) => {
+        setUploadError(err instanceof Error ? err.message : 'Upload failed');
+        uploadTriggeredRef.current = false; // allow retry on file re-select
+        if (uploadedId) {
+          videosApi.delete(uploadedId).catch(() => {});
+          setVideoId(null);
+        }
+      })
+      .finally(() => {
+        setUploading(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadData.file]);
 
+  // â”€â”€ Step 0 â†’ Step 1 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const handleStep0Next = useCallback(async () => {
+    if (!videoId || !uploadData.name.trim()) return;
+    // Edit mode: campaign already exists — just advance.
+    if (campaign) {
+      setActiveStep(1);
+      return;
+    }
+    setUploadError(null);
     try {
-      // 1. Upload video
-      const video = await uploadVideo(setupData.file);
-      uploadedVideoId = video.id;
-      setVideoId(video.id);
-      setUploadProgress(50);
-
-      // 2. Create campaign
-      const camp = await createCampaign({
-        videoId: video.id,
-        name: setupData.name,
-        targetAudience: setupData.targetAudience ?? undefined,
-        description: setupData.description || undefined,
-      });
+      const { isAvailable } = await campaignsApi.checkName(uploadData.name.trim());
+      if (!isAvailable) {
+        setUploadError('A campaign with this name already exists. Please choose a different name.');
+        return;
+      }
+    } catch {
+      setUploadError('Could not validate campaign name. Please try again.');
+      return;
+    }
+    setCreatingCampaign(true);
+    try {
+      const camp = await createCampaign({ videoId, name: uploadData.name });
       setCampaign(camp);
-      setUploadProgress(70);
+      setActiveStep(1);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Failed to create campaign');
+    } finally {
+      setCreatingCampaign(false);
+    }
+  }, [videoId, uploadData.name, campaign, createCampaign]);
 
-      // 3. Trigger AI processing
-      await processVideo(video.id, {
-        targetAudience: setupData.targetAudience ?? undefined,
-        description: setupData.description || undefined,
+  // â”€â”€ Step 1 â†’ Step 2: create campaign + trigger Phase 2 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const handleStep1Next = useCallback(async () => {
+    if (!videoId || !campaign) return;
+    setProcessError(null);
+    setProcessing(true);
+    try {
+      // Persist audience/description on the already-created campaign draft.
+      await updateCampaign(campaign.id, {
+        targetAudience: summarizeData.targetAudience ?? undefined,
+        description: summarizeData.description || undefined,
       });
-      setUploadProgress(100);
+
+      // Phase 2: highlight detection (transcript cache hit guaranteed)
+      await processVideo(videoId, {
+        targetAudience: summarizeData.targetAudience ?? undefined,
+        description: summarizeData.description || undefined,
+      });
 
       toast.current?.show({
         severity: 'success',
-        summary: 'Video uploaded',
-        detail: 'AI processing started. Clips will appear shortly.',
+        summary: 'AI Processing Started',
+        detail: 'Clips will appear shortly.',
         life: 4000,
       });
 
-      // Move to step 2
-      setActiveStep(1);
+      setActiveStep(2);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed');
-
-      // Layer 2: clean up the orphaned video if it was already uploaded
-      if (uploadedVideoId !== null) {
-        videosApi.delete(uploadedVideoId).catch(() => {});
-        setVideoId(null);
-      }
+      setProcessError(err instanceof Error ? err.message : 'Failed to start processing');
     } finally {
-      setUploading(false);
+      setProcessing(false);
     }
-  }, [setupData, uploadVideo, createCampaign, processVideo]);
+  }, [videoId, campaign, summarizeData, updateCampaign, processVideo]);
 
-  // ── Step 2: Approve / Update / Regenerate ──────────────────────────────
+  // â”€â”€ Step 2: Approve / Update / Regenerate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleApprove = useCallback(
     async (fragmentId: string) => {
       try {
         await updateFragment(fragmentId, { isApproved: true });
         setApprovedFragmentId(fragmentId);
-        setActiveStep(2);
+        setActiveStep(3);
       } catch {
         toast.current?.show({ severity: 'error', summary: 'Failed to approve clip', life: 3000 });
       }
@@ -261,7 +288,7 @@ export default function CreateCampaignPage() {
       }
       setApprovedFragmentId(null);
     }
-    setActiveStep(1);
+    setActiveStep(2);
   }, [approvedFragmentId, updateFragment, refetchFragments]);
 
   const handleUpdateCaption = useCallback(
@@ -296,17 +323,16 @@ export default function CreateCampaignPage() {
       toast.current?.show({
         severity: 'info',
         summary: 'Regenerating',
-        detail: 'AI is reprocessing your video. Please wait…',
+        detail: 'AI is reprocessing your video. Please waitâ€¦',
         life: 4000,
       });
-      // SSE callback will set regenerating=false and refetch
     } catch {
       setRegenerating(false);
       toast.current?.show({ severity: 'error', summary: 'Regeneration failed', life: 3000 });
     }
   }, [videoId, processVideo]);
 
-  // ── Save as Draft ──────────────────────────────────────────────────────
+  // â”€â”€ Save as Draft â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleSaveAsDraft = useCallback(async () => {
     if (!campaign) return;
     try {
@@ -323,9 +349,20 @@ export default function CreateCampaignPage() {
     }
   }, [campaign, updateCampaign, navigate]);
 
-  // ── Step 3: Schedule / Publish ─────────────────────────────────────────
+  // â”€â”€ Step 3: Schedule / Publish â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const selectedFragment = fragments?.find((f) => f.id === approvedFragmentId);
   const approvedFragments = selectedFragment ? [selectedFragment] : [];
+
+  const { data: platforms, loading: platformsLoading } = useMyPlatforms();
+  const { data: campaignPosts } = useCampaignPosts(campaign?.id ?? '', !!campaign);
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+  const { data: scheduledPosts } = useScheduledPostsInRange(monthStart, monthEnd);
+
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const handleSchedule = useCallback(
     async (platformIds: string[], scheduledAt: Date) => {
@@ -379,7 +416,6 @@ export default function CreateCampaignPage() {
             await publishPost(createdPost.id);
           }
         }
-        // Mark campaign as Active
         await updateCampaign(campaign.id, { status: 1 });
         toast.current?.show({
           severity: 'success',
@@ -403,7 +439,6 @@ export default function CreateCampaignPage() {
     exit: { opacity: 0, x: -30 },
   }), []);
 
-  // Show spinner while loading an existing draft to prevent step-0 flicker
   if (editId && !draftReady) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
@@ -439,13 +474,14 @@ export default function CreateCampaignPage() {
             exit="exit"
             transition={{ duration: 0.3, ease: 'easeInOut' }}
           >
-            <StepCampaignSetup
-              data={setupData}
-              onChange={setSetupData}
-              onNext={handleStep1Next}
+            <StepVideoUpload
+              data={uploadData}
+              onChange={setUploadData}
+              onNext={handleStep0Next}
               uploading={uploading}
               uploadProgress={uploadProgress}
               uploadError={uploadError}
+              creating={creatingCampaign}
             />
           </motion.div>
         )}
@@ -453,6 +489,27 @@ export default function CreateCampaignPage() {
         {activeStep === 1 && (
           <motion.div
             key="step-1"
+            variants={stepVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          >
+            <StepVideoSummarize
+              data={summarizeData}
+              onChange={setSummarizeData}
+              summary={summary}
+              summaryLoading={summaryLoading}
+              onNext={handleStep1Next}
+              processing={processing}
+              processError={processError}
+            />
+          </motion.div>
+        )}
+
+        {activeStep === 2 && (
+          <motion.div
+            key="step-2"
             variants={stepVariants}
             initial="initial"
             animate="animate"
@@ -473,9 +530,9 @@ export default function CreateCampaignPage() {
           </motion.div>
         )}
 
-        {activeStep === 2 && (
+        {activeStep === 3 && (
           <motion.div
-            key="step-2"
+            key="step-3"
             variants={stepVariants}
             initial="initial"
             animate="animate"
@@ -500,3 +557,4 @@ export default function CreateCampaignPage() {
     </div>
   );
 }
+

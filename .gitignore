@@ -226,6 +226,7 @@ worker/outputs/
 # ===========================
 .idea/
 *.iml
+*.lscache
 .vscode/settings.json
 .vscode/launch.json
 .vscode/tasks.json

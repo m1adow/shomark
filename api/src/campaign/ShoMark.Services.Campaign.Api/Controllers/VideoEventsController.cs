@@ -30,9 +30,9 @@ public class VideoEventsController : ControllerBase
 
         try
         {
-            await foreach (var payload in reader.ReadAllAsync(ct))
+            await foreach (var evt in reader.ReadAllAsync(ct))
             {
-                await Response.WriteAsync($"event: processing-complete\ndata: {payload}\n\n", ct);
+                await Response.WriteAsync($"event: {evt.EventType}\ndata: {evt.Data}\n\n", ct);
                 await Response.Body.FlushAsync(ct);
             }
         }

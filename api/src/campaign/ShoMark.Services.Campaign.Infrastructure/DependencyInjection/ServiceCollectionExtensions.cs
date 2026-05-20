@@ -30,9 +30,11 @@ public static class ServiceCollectionExtensions
         services.Configure<ShoMark.Application.Common.KafkaOptions>(configuration.GetSection(ShoMark.Application.Common.KafkaOptions.SectionName));
         services.Configure<ShoMark.Messaging.KafkaOptions>(configuration.GetSection(ShoMark.Messaging.KafkaOptions.SectionName));
         services.AddSingleton<IVideoProcessingProducer, KafkaVideoProcessingProducer>();
+        services.AddSingleton<IVideoTranscriptionProducer, KafkaVideoTranscriptionProducer>();
         services.AddSingleton<IVideoProcessingNotifier, VideoProcessingNotifier>();
         services.AddSingleton<IKafkaEventPublisher, KafkaEventPublisher>();
         services.AddHostedService<KafkaCompletionConsumer>();
+        services.AddHostedService<KafkaSummarizationConsumer>();
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.Configure<MinioOptions>(configuration.GetSection(MinioOptions.SectionName));

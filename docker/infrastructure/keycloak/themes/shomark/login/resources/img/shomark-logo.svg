@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" width="160" height="40" role="img" aria-label="ShoMark">
+  <!-- Bolt icon -->
+  <polygon
+    points="18,2 9,22 16,22 12,38 27,16 19,16 25,2"
+    fill="#2563eb"
+  />
+  <!-- Wordmark -->
+  <text
+    x="34"
+    y="29"
+    font-family="Inter, system-ui, -apple-system, sans-serif"
+    font-size="22"
+    font-weight="600"
+    fill="#111827"
+    letter-spacing="-0.3"
+  >ShoMark</text>
+</svg>
