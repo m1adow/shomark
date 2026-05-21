@@ -229,3 +229,62 @@ class TestInterpolateTrajectory:
         result = self.r._interpolate_trajectory(traj, output_fps=10.0)
         assert abs(result[0][0] - 2.0) < 1e-6
         assert abs(result[-1][0] - 3.0) < 1e-6
+
+
+# ===========================================================================
+# _detect_layout_type — layout classification heuristic
+# ===========================================================================
+
+class TestDetectLayoutType:
+    """Tests use synthetic numpy frames — no video I/O or cv2.VideoCapture."""
+
+    def _make_frames_with_edges(self, height: int, width: int, edge_side: str, n: int = 5):
+        """Create N identical frames with dense edges on one side and a blank other side.
+
+        *edge_side* is ``'left'`` or ``'right'``.  The edge side contains a
+        white-on-black text-like pattern (alternating rows/cols); the other
+        side is solid grey (uniform, no edges).
+        """
+        frames = []
+        for _ in range(n):
+            frame = np.full((height, width, 3), 128, dtype=np.uint8)
+            mid = width // 2
+            if edge_side == "left":
+                # Checkerboard on left half — dense Canny edges
+                frame[:, :mid:2, :] = 255
+                frame[::2, :mid, :] = 0
+            else:
+                # Checkerboard on right half
+                frame[:, mid::2, :] = 255
+                frame[::2, mid:, :] = 0
+        frames.append(frame)
+        return frames
+
+    def _call(self, frames, frame_w: int) -> str:
+        with patch("reframer._cv2_available", True):
+            from reframer import Reframer
+        return Reframer._detect_layout_type(frames, frame_w)
+
+    def test_dominant_left_half_returns_screenshare_pip(self):
+        frames = self._make_frames_with_edges(360, 640, "left")
+        result = self._call(frames, 640)
+        assert result == "screenshare_pip"
+
+    def test_dominant_right_half_returns_screenshare_pip(self):
+        frames = self._make_frames_with_edges(360, 640, "right")
+        result = self._call(frames, 640)
+        assert result == "screenshare_pip"
+
+    def test_balanced_edges_returns_side_by_side(self):
+        # Both halves have identical checkerboard — ratio ≈ 1.0
+        height, width = 360, 640
+        frame = np.zeros((height, width, 3), dtype=np.uint8)
+        frame[::2, ::2, :] = 255  # uniform checkerboard across full width
+        result = self._call([frame] * 5, width)
+        assert result == "side_by_side"
+
+    def test_blank_frame_returns_side_by_side(self):
+        # All-grey frames → no edges anywhere → ratio stays at ~1 → side_by_side
+        frame = np.full((360, 640, 3), 128, dtype=np.uint8)
+        result = self._call([frame] * 5, 640)
+        assert result == "side_by_side"

@@ -8,17 +8,18 @@ logger = logging.getLogger(__name__)
 
 
 class VideoProcessor:
-    """Cut and dynamically reframe highlight clips from a source video.
+    """Cut and reframe highlight clips into a 9:16 blur-background canvas.
 
     Each clip is produced in two passes:
     1. A fast lossless cut (``-c copy``) isolates the highlight segment.
-    2. ``Reframer`` analyses per-frame saliency to build a smooth 9:16 crop
-       trajectory, then re-encodes with FFmpeg's ``sendcmd`` filter.
+    2. An FFmpeg ``filter_complex`` composites the segment onto a 9:16 canvas:
+       the 16:9 source is scaled up and blurred to fill the background, and the
+       original 16:9 video is overlaid centered at full width.
     """
 
-    def __init__(self, output_dir: str = "/tmp/highlights", reframer=None) -> None:
+    def __init__(self, output_dir: str = "/tmp/highlights", encoder: str = "libx264") -> None:
         self._output_dir = output_dir
-        self._reframer = reframer
+        self._encoder = encoder
 
     def cut_highlights(self, video_path: str, highlights: list[dict], output_dir: str | None = None) -> list[dict]:
         """Cut clips and return a list of {"path": ..., "title": ..., "reason": ...}.
@@ -45,9 +46,8 @@ class VideoProcessor:
             segment_path = output_path + ".seg.mp4"
             self._cut_segment(video_path, start, end, segment_path)
             try:
-                # Pass 2: saliency-based reframing → final 9:16 output
-                trajectory = self._reframer.compute_trajectory(segment_path)
-                self._reframer.render(segment_path, trajectory, output_path)
+                # Pass 2: blur-background 9:16 composite
+                self._reframe_segment(segment_path, output_path, self._encoder)
             finally:
                 if os.path.exists(segment_path):
                     os.remove(segment_path)
@@ -108,6 +108,42 @@ class VideoProcessor:
                 "-i", video_path,
                 "-c", "copy",
                 "-avoid_negative_ts", "make_zero",
+                output_path,
+            ],
+            capture_output=True, check=True,
+        )
+
+    @staticmethod
+    def _reframe_segment(input_path: str, output_path: str, encoder: str = "libx264") -> None:
+        """Composite a 9:16 output: heavily blurred scaled-up background + centered 16:9 overlay.
+
+        The input (typically 16:9) is duplicated:
+        - Background: scaled to fill 1080×1920, cropped, then heavily blurred (sigma=40).
+        - Foreground: scaled to 1080px wide preserving aspect ratio, overlaid centered.
+        """
+        filter_complex = (
+            "[0:v]split=2[bg_src][fg_src];"
+            "[bg_src]scale=1080:1920:force_original_aspect_ratio=increase,"
+            "crop=1080:1920,gblur=sigma=40[blurred];"
+            "[fg_src]scale=1080:-2[scaled];"
+            "[blurred][scaled]overlay=(W-w)/2:(H-h)/2[out]"
+        )
+        vcodec_args = (
+            ["-preset", "p4", "-cq", "23"]
+            if encoder == "h264_nvenc"
+            else ["-preset", "fast", "-crf", "23"]
+        )
+        subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-i", input_path,
+                "-filter_complex", filter_complex,
+                "-map", "[out]",
+                "-map", "0:a?",
+                "-c:v", encoder,
+                *vcodec_args,
+                "-c:a", "aac",
+                "-b:a", "128k",
                 output_path,
             ],
             capture_output=True, check=True,

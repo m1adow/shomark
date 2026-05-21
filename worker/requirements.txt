@@ -2,5 +2,4 @@ faster-whisper>=1.0.0
 requests
 confluent-kafka
 minio
-opencv-contrib-python
 numpy

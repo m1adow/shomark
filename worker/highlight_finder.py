@@ -86,10 +86,15 @@ class HighlightFinder:
         chunk_start = compact[0]["s"] if compact else 0.0
         chunk_end = compact[-1]["e"] if compact else 0.0
         max_start = max(chunk_start, chunk_end - self._clip_duration)
+        # Stricter rule: start/end must equal the s/e of a real block above
+        # (no arbitrary arithmetic). This kills mid-word cuts and 0-anchoring.
         time_window_block = (
-            f"ДІАПАЗОН ЦЬОГО ФРАГМЕНТА: {chunk_start:.1f}s – {chunk_end:.1f}s. "
-            f"Поле 'start' має бути в межах [{chunk_start:.1f}, {max_start:.1f}] — НЕ використовуй 0, "
-            f"якщо діапазон починається не з 0."
+            f"ДІАПАЗОН ЦЬОГО ФРАГМЕНТА: {chunk_start:.1f}s – {chunk_end:.1f}s.\n"
+            f"ПРАВИЛО ЧАСУ (критично):\n"
+            f"- 'start' = ТОЧНО значення поля 's' одного з блоків вище. НЕ обчислюй, не округлюй до 0.\n"
+            f"- 'end' = ТОЧНО значення поля 'e' блоку, де думка завершується.\n"
+            f"- Тривалість (end − start) у межах [{max(self._clip_duration - 10, 20)}, {self._clip_duration + 15}] секунд.\n"
+            f"- 'start' має бути в межах [{chunk_start:.1f}, {max_start:.1f}]."
         )
 
 
@@ -123,7 +128,7 @@ class HighlightFinder:
                 "   що згадуються у відповідності до інструкції користувача.\n"
                 "2) Для КОЖНОЇ сутності знайди у транскрипті блок (s, e), де спікер вперше про неї говорить,\n"
                 "   і візьми 'start' = s цього блоку (НЕ 0, НЕ початок фрагмента, якщо сутність згадана пізніше).\n"
-                f"3) 'end' = start + {self._clip_duration}. Кожна сутність → один окремий об'єкт у JSON.\n"
+                f"3) 'end' = момент завершення думки або речення (оптимально start + {self._clip_duration}, дозволено до start + {self._clip_duration + 15}). Кожна сутність → один окремий об'єкт у JSON.\n"
                 f"4) Якщо сутностей знайдено N, поверни саме N об'єктів (не 2, не {self._top_highlights}).\n\n"
                 f"{time_window_block}\n\n"
                 f"Стиль (title, reason, hashtags) — для аудиторії {profile['persona']} на {profile['platform']}, "
@@ -132,9 +137,9 @@ class HighlightFinder:
             # Use placeholders, not concrete numbers, to avoid biasing 'start' to 0/10.
             json_example = (
                 "[\n"
-                "  {\"start\": <реальний_час_першої_сутності>, \"end\": <start + " + str(self._clip_duration) + ">, "
+                "  {\"start\": <реальний_час_першої_сутності>, \"end\": <кінець думки, ~start + " + str(self._clip_duration) + ", max start + " + str(self._clip_duration + 15) + ">, "
                 "\"title\": \"Назва сутності 1\", \"reason\": \"Чому цей кліп\", \"viral_score\": 0.8, \"hashtags\": \"#хештег1 #хештег2\"},\n"
-                "  {\"start\": <реальний_час_другої_сутності>, \"end\": <start + " + str(self._clip_duration) + ">, "
+                "  {\"start\": <реальний_час_другої_сутності>, \"end\": <кінець думки, ~start + " + str(self._clip_duration) + ", max start + " + str(self._clip_duration + 15) + ">, "
                 "\"title\": \"Назва сутності 2\", \"reason\": \"Чому цей кліп\", \"viral_score\": 0.8, \"hashtags\": \"#хештег1 #хештег2\"}\n"
                 "  // ... стільки об'єктів, скільки сутностей знайдено\n"
                 "]"
@@ -142,20 +147,39 @@ class HighlightFinder:
         else:
             user_block = ""
             task_line = (
-                f"Знайди 2 найбільш захоплюючі моменти тривалістю рівно {self._clip_duration} секунд.\n"
-                f"Обчисли точний час 'start' та 'end' (end = start + {self._clip_duration}).\n"
+                f"Знайди 2 найбільш захоплюючі моменти.\n"
                 f"{time_window_block}\n\n"
                 f"Шукай моменти, які містять:\n{profile['criteria']}\n\n"
-                f"Уникай: {profile['avoid']}."
+                f"Уникай: {profile['avoid']}.\n\n"
+                f"ЯКІСТЬ ПОЛІВ (обов'язково):\n"
+                f"- 'title': іменна фраза до 8 слів, з конкретним фактом/числом/власною назвою з кліпу.\n"
+                f"  ПОГАНО: \"Цікавий момент про навчання\", \"Захоплива історія студента\".\n"
+                f"  ДОБРЕ: \"Стипендія 8000 грн для першокурсників ФІТ\", \"Грант на стажування у Берліні\".\n"
+                f"- 'reason': 1–2 речення, починаючи з дієслова вигоди для аудиторії "
+                f"(\"Приваблює…\", \"Мотивує…\", \"Демонструє…\"). Має посилатися на конкретний факт із кліпу.\n"
+                f"- 'hashtags': 3–5 штук. Щонайменше 2 мають бути ВЛАСНІ назви з кліпу "
+                f"(спеціальність, технологія, програма, місто, ім'я). Заборонено лише загальні: "
+                f"#навчання #університет #освіта #студент без жодного конкретного.\n"
+                f"- 'viral_score' (рубрика): 0.9+ = названо досягнення/конкретне число/власну назву; "
+                f"0.7 = емоційний, але без конкретики; 0.5 = інформативний, але плаский; <0.5 = філер. "
+                f"Розкид оцінок між кандидатами обов'язковий — НЕ став усім 0.8."
             )
+            # Use real s/e from the compacted blocks for the example, so the model sees
+            # values it can actually copy from the data above.
+            ex1_s = compact[0]["s"] if compact else chunk_start
+            ex1_e = next((b["e"] for b in compact if b["e"] - ex1_s >= self._clip_duration - 10), compact[-1]["e"] if compact else chunk_end)
+            ex2_s = compact[len(compact) // 2]["s"] if len(compact) > 2 else ex1_s
+            ex2_e = next((b["e"] for b in compact if b["s"] >= ex2_s and b["e"] - ex2_s >= self._clip_duration - 10), compact[-1]["e"] if compact else chunk_end)
             json_example = (
                 "[\n"
-                f"  {{\"start\": {chunk_start + 5:.1f}, \"end\": {chunk_start + 5 + self._clip_duration:.1f}, "
-                "\"title\": \"Короткий заголовок українською\", \"reason\": \"Чому це зачепить аудиторію\", "
-                "\"viral_score\": 0.85, \"hashtags\": \"#хештег1 #хештег2 #хештег3\"},\n"
-                f"  {{\"start\": {min(chunk_start + 60, max_start):.1f}, \"end\": {min(chunk_start + 60, max_start) + self._clip_duration:.1f}, "
-                "\"title\": \"Короткий заголовок українською\", \"reason\": \"Чому це зачепить аудиторію\", "
-                "\"viral_score\": 0.7, \"hashtags\": \"#хештег1 #хештег2 #хештег3\"}\n"
+                f"  {{\"start\": {ex1_s:.1f}, \"end\": {ex1_e:.1f}, "
+                "\"title\": \"Стипендія 8000 грн для першокурсників ФІТ\", "
+                "\"reason\": \"Приваблює абітурієнтів конкретною сумою фінансової підтримки на старті навчання.\", "
+                "\"viral_score\": 0.9, \"hashtags\": \"#ФІТ #стипендія8000 #першокурсник #абітурієнт2026\"},\n"
+                f"  {{\"start\": {ex2_s:.1f}, \"end\": {ex2_e:.1f}, "
+                "\"title\": \"Стажування у Berlin DevHub за обміном\", "
+                "\"reason\": \"Демонструє реальну міжнародну можливість після другого курсу.\", "
+                "\"viral_score\": 0.75, \"hashtags\": \"#BerlinDevHub #обмін #стажування #IT_кар'єра\"}\n"
                 "]"
             )
 
@@ -240,9 +264,16 @@ class HighlightFinder:
                 f"{json.dumps(candidates, ensure_ascii=False)}\n\n"
                 f"Критерії вибору (від важливого до менш важливого):\n"
                 f"1. Відповідність аудиторії — чи резонує момент із потребами/інтересами цільової групи?\n"
-                f"2. Емоційний вплив — чи викликає відео емоцію (захват, мотивацію, цікавість)?\n"
-                f"3. Унікальність — чи є щось, чого немає в конкурентів?\n"
-                f"4. Різноманітність — обирай кліпи на різні теми (не два про одне й те саме)\n\n"
+                f"2. Конкретність — чи є у title/reason власна назва, число або іменоване досягнення?\n"
+                f"3. Емоційний вплив — чи викликає відео емоцію (захват, мотивацію, цікавість)?\n"
+                f"4. Тематична різноманітність — ЗАБОРОНЕНО, щоб два фінальні кліпи мали однаковий "
+                f"перший іменник у title (напр. два про \"стипендію\"). Обирай різні теми.\n\n"
+                f"ОНОВЛЕННЯ ПОЛІВ:\n"
+                f"- 'viral_score' (рубрика): 0.9+ = конкретне досягнення/число/власна назва; "
+                f"0.7 = емоційно, але загально; 0.5 = плоско. Розкид між фіналістами обов'язковий.\n"
+                f"- Якщо title чи reason у кандидата генеричні (\"Цікавий момент…\", \"Захоплива історія…\") — "
+                f"ПЕРЕПИШИ їх з конкретним фактом із поля reason кандидата.\n"
+                f"- Хештеги: щонайменше 2 з 3–5 — власні назви з кліпу (не лише #навчання #університет).\n\n"
                 f"Поверни ТІЛЬКИ список з {self._top_highlights} об'єктів JSON у тому ж форматі (без пояснень)."
             )
 
@@ -328,77 +359,7 @@ class HighlightFinder:
 
         return blocks
 
-    # --- Two-Pass Pipeline (user instruction mode) ---
-
-    def _extract_entities(
-        self,
-        segments: list[dict],
-        description: str,
-        additional_instructions: str | None = None,
-    ) -> list[str]:
-        """Pass 1: extract distinct entities (professions, topics, etc.) from the full transcript."""
-        compact = self._compact_segments(segments, max_blocks=120)
-        parts = [p for p in [description, additional_instructions] if p]
-        combined = "\n".join(parts)
-        prompt = (
-            "Ти — аналітик відеоконтенту.\n\n"
-            "Ось транскрипт відео (s — час початку в секундах, e — час кінця, t — текст):\n"
-            f"{json.dumps(compact, ensure_ascii=False)}\n\n"
-            f"ІНСТРУКЦІЯ: {combined}\n\n"
-            "Знайди у транскрипті УСІ конкретні ІМЕНОВАНІ сутності того типу, що вказаний в інструкції.\n"
-            "Правило: якщо інструкція про 'IT-професії' → повертай конкретні назви професій ('DevOps-інженер', 'Frontend-розробник'), а НЕ теми ('IT-ринок', 'Баг').\n"
-            "Аналогічно для будь-якого іншого типу сутностей.\n\n"
-            "Відповідай ТІЛЬКИ JSON масивом рядків, без пояснень, без markdown:\n"
-            '["Назва 1", "Назва 2", "Назва 3"]'
-        )
-        raw = self._llm.generate(prompt, temperature=0.1, think=False)
-        logger.debug("TWO-PASS Pass 1 raw response: %s", raw[:600])
-        start_idx = raw.find("[")
-        end_idx = raw.rfind("]") + 1
-        if start_idx == -1 or end_idx == 0:
-            logger.warning("TWO-PASS Pass 1: no JSON array found. Raw response: %s", raw[:500])
-            return []
-        try:
-            parsed = json.loads(raw[start_idx:end_idx])
-            if isinstance(parsed, list):
-                return [str(e) for e in parsed if e]
-        except json.JSONDecodeError as exc:
-            logger.error("TWO-PASS Pass 1: JSON parse error: %s", exc)
-        return []
-
-    def _find_timestamps_for_entities(
-        self,
-        segments: list[dict],
-        entities: list[str],
-        target_audience: str | None,
-    ) -> list[dict]:
-        """Pass 2: find the best timestamp for each entity in a single LLM call."""
-        profile = _audience_profile(target_audience)
-        compact = self._compact_segments(segments, max_blocks=120)
-        chunk_start = compact[0]["s"] if compact else 0.0
-        chunk_end = compact[-1]["e"] if compact else 0.0
-        max_start = max(chunk_start, chunk_end - self._clip_duration)
-        entities_json = json.dumps(entities, ensure_ascii=False)
-        prompt = (
-            "Ти — аналітик відеоконтенту.\n\n"
-            "Ось транскрипт відео (s — час початку в секундах, e — час кінця, t — текст):\n"
-            f"{json.dumps(compact, ensure_ascii=False)}\n\n"
-            f"СПИСОК СУТНОСТЕЙ: {entities_json}\n\n"
-            f"ЗАВДАННЯ: Для КОЖНОЇ сутності зі списку знайди у транскрипті той блок,\n"
-            f"де спікер ВПЕРШЕ суттєво про неї говорить.\n"
-            f"- 'start' = значення 's' цього блоку (секунди), обов'язково в межах [{chunk_start:.1f}, {max_start:.1f}]\n"
-            f"- 'end' = start + {self._clip_duration}\n"
-            f"- 'title' = назва сутності (українською)\n"
-            f"- 'reason' = 1–2 речення, чому цей кліп цікавий для: {profile['persona']}\n"
-            f"- 'viral_score' = 0.0–1.0\n"
-            f"- 'hashtags' = 3–5 хештегів для {profile['platform']} (через пробіл, українською)\n\n"
-            f"Якщо сутність НЕ знайдена у транскрипті — не включай її у відповідь.\n"
-            f"Поверни ТІЛЬКИ JSON масив (без пояснень):\n"
-            f'[{{"start": <число>, "end": <число>, "title": "...", "reason": "...", "viral_score": 0.8, "hashtags": "..."}}]'
-        )
-        results = self._llm.generate_json_array(prompt)
-        logger.info("TWO-PASS Pass 2: found timestamps for %d/%d entities", len(results), len(entities))
-        return results
+    # --- User-Instruction Pipeline (single-call full-transcript) ---
 
     def _find_highlights_two_pass(
         self,
@@ -412,22 +373,13 @@ class HighlightFinder:
         t0 = time.perf_counter()
         profile = _audience_profile(target_audience)
 
-        # Sample segments evenly — avoids the time-gap merger that collapses
-        # continuous speech into ~5 giant truncated blocks, losing all entity names.
-        max_sample = 120
-        if len(segments) > max_sample:
-            step = len(segments) / max_sample
-            sampled = [segments[int(i * step)] for i in range(max_sample)]
-        else:
-            sampled = segments
-
+        # Send the full transcript — no sampling. Context window is sized
+        # dynamically below based on actual prompt length so nothing is ever dropped.
         # Human-readable format: model processes [MM:SS] text far better than raw JSON
         transcript_lines = "\n".join(
             f"[{int(seg['start']) // 60:02d}:{int(seg['start']) % 60:02d}] {seg['text'].strip()}"
-            for seg in sampled
+            for seg in segments
         )
-        chunk_end = sampled[-1]["end"] if sampled else 0.0
-        max_start = max(0.0, chunk_end - self._clip_duration)
 
         parts = [p for p in [description, additional_instructions] if p]
         combined = "\n".join(parts)
@@ -437,22 +389,117 @@ class HighlightFinder:
             "ТРАНСКРИПТ (формат [хх:хх] = хвилини:секунди від початку відео):\n"
             f"{transcript_lines}\n\n"
             f"ІНСТРУКЦІЯ: {combined}\n\n"
-            "ЗАВДАННЯ: Виконай інструкцію БУКВАЛЬНО. Для КОЖНОЇ сутності (професії, теми, пункту тощо), "
-            "про яку потрібно зробити кліп, знайди у транскрипті момент першого суттєвого згадування "
-            "і поверни один JSON об'єкт.\n\n"
-            f"Правила для кожного об'єкта:\n"
-            f"- 'start': час у секундах від початку відео (не більше {max_start:.0f})\n"
-            f"- 'end': start + {self._clip_duration}\n"
-            f"- 'title': назва сутності (українською)\n"
-            f"- 'reason': 1–2 речення, чому кліп цікавий для: {profile['persona']}\n"
-            f"- 'viral_score': 0.0–1.0\n"
-            f"- 'hashtags': 3–5 хештегів для {profile['platform']} (через пробіл, українською)\n\n"
+            "КРОК 1 — СПИСОК СУТНОСТЕЙ:\n"
+            "Перш ніж відповідати, подумки склади нумерований список УСІХ окремих сутностей "
+            "(професій / тем / пунктів), що згадуються у транскрипті відповідно до інструкції. "
+            "Кількість об'єктів у фінальному JSON має ТОЧНО дорівнювати довжині цього списку — "
+            "ані більше, ані менше. Якщо у транскрипті 6 професій — поверни 6 об'єктів, не 2 і не 10.\n\n"
+            "КРОК 2 — ДЛЯ КОЖНОЇ СУТНОСТІ знайди у транскрипті головний блок, де спікер ДЕТАЛЬНО "
+            "її розкриває (не перше побіжне згадування, а основний блок).\n\n"
+            "ПРАВИЛА МЕЖ КЛІПУ (критично важливо для точності):\n"
+            "- 'start': знайди рядок транскрипту, де спікер ВПЕРШЕ НАЗИВАЄ цю конкретну сутність у головному блоку "
+            "(шукай рядок, що містить саму назву або її синонім). 'start' = час цього рядку у СЕКУНДАХ.\n"
+            "  Конвертація [хх:хх] → секунди: хв*60 + сек. Приклад: [32:16] = 32*60+16 = 1936.\n"
+            "  ЗАБОРОНА: не встановлюй 'start' на рядок, де ще говорять про ПОПЕРЕДНЮ сутність — "
+            "навіть якщо він знаходиться за кілька секунд до назви твоєї сутності.\n"
+            "- 'end': час, коли спікер ЗАВЕРШУЄ розмову про цю сутність і переходить до НАСТУПНОЇ "
+            "(тобто рядок, де перший раз згадується наступна сутність або нова тема). "
+            "'end' = час цього рядку у секундах. Діапазон: від start+30 до start+180.\n"
+            "  ЗАБОРОНА: не включай у кліп початок наступної сутності.\n\n"
+            "ПРАВИЛО МІНІМАЛЬНОГО ІНТЕРВАЛУ: між будь-якими двома 'start' — щонайменше 30 секунд. "
+            "Якщо два кандидати потрапили б у той самий момент — обери лише той, що краще відповідає інструкції.\n\n"
+            "САМОПЕРЕВІРКА перед відповіддю: для кожного кліпу переконайся, що:\n"
+            "  1) рядок [хх:хх] з часом 'start' СПРАВДІ містить назву саме цієї сутності,\n"
+            "  2) весь вміст між 'start' і 'end' стосується ЛИШЕ цієї сутності, без сусідніх,\n"
+            "  3) жодні два кліпи НЕ мають однаковий або близький 'start' (≥ 30 секунд),\n"
+            "  4) кількість об'єктів = кількість сутностей зі списку Кроку 1.\n"
+            "  Якщо для сутності неможливо знайти унікальний 'start' — не включай її у відповідь.\n\n"
+            f"Для кожного об'єкта:\n"
+            f"- 'start': секунди (ціле число)\n"
+            f"- 'end': секунди (ціле число)\n"
+            f"- '_anchor': КОРОТКА копія перших 60–80 символів рядка транскрипту з часом 'start' "
+            f"(формат \"[хх:хх] перші слова…\"). Використовується для перевірки — НЕ копіюй увесь рядок, "
+            f"достатньо початку. Це поле має бути ЯКОМОГА КОРОТШИМ, щоб JSON не обірвався.\n"
+            f"- 'title': назва сутності (українською, іменна фраза до 8 слів, без шаблонів типу "
+            f"\"Цікавий момент\" — лише конкретна назва сутності)\n"
+            f"- 'reason': 1–2 речення, починай з дієслова вигоди (\"Приваблює…\", \"Демонструє…\", "
+            f"\"Мотивує…\"), посилайся на конкретний факт. Аудиторія: {profile['persona']}\n"
+            f"- 'viral_score' (рубрика): 0.9+ = названо досягнення/число/власну назву; 0.7 = емоційно, "
+            f"але загально; 0.5 = інформативно, але плоско. Розкид між кліпами обов'язковий.\n"
+            f"- 'hashtags' = 3–5 хештегів для {profile['platform']} (через пробіл, українською). "
+            f"Щонайменше 2 — власні назви з кліпу (технологія, програма, ім'я), не лише загальні теги.\n\n"
             f"Відповідай ТІЛЬКИ JSON масивом, без пояснень:\n"
-            f'[{{"start": 219, "end": {219 + self._clip_duration}, "title": "...", "reason": "...", "viral_score": 0.8, "hashtags": "..."}}]'
+            f'[{{"start": 1936, "end": 2037, "_anchor": "[32:16] …назва сутності…", '
+            f'"title": "...", "reason": "...", "viral_score": 0.8, "hashtags": "..."}}]'
         )
 
-        logger.info("USER-INSTRUCTION: single LLM call over full transcript (%d segments sampled)", len(sampled))
-        results = self._llm.generate_json_array(prompt)
+        # Calculate the context window from actual prompt size.
+        # ~3 chars per token for Ukrainian Cyrillic; reserve 8192 tokens for output
+        # — each clip object with _anchor is ~150-200 tokens, so this fits ~40 clips
+        # before truncation. Previous 4096 reserve truncated mid-string at ~6 clips.
+        required_ctx = max(12288, len(prompt) // 3 + 8192)
+
+        logger.info(
+            "USER-INSTRUCTION: full transcript (%d segments), prompt_chars=%d, num_ctx=%d",
+            len(segments), len(prompt), required_ctx,
+        )
+        results = self._llm.generate_json_array(prompt, num_ctx=required_ctx)
+
+        # Anchor validation: each clip's `_anchor` must be a substring match of the
+        # transcript line that *actually* corresponds to its `start`. This catches
+        # the model when it copies a plausible-looking line but anchors `start`
+        # into an adjacent entity's block. After validation we strip `_anchor`
+        # so it never reaches downstream consumers.
+        if results:
+            # Build a map from (mm:ss) → segment text for fast lookup.
+            line_at = {}
+            for seg in segments:
+                key = f"[{int(seg['start']) // 60:02d}:{int(seg['start']) % 60:02d}]"
+                line_at[key] = seg["text"].strip()
+
+            validated: list[dict] = []
+            for h in results:
+                anchor = (h.get("_anchor") or "").strip()
+                start_s = h.get("start", 0)
+                title = (h.get("title") or "").strip()
+                # Find the transcript line whose [mm:ss] tag is closest to start_s.
+                key = f"[{int(start_s) // 60:02d}:{int(start_s) % 60:02d}]"
+                actual_line = line_at.get(key)
+                anchor_ok = True
+                if actual_line and anchor:
+                    # Normalise: drop the [mm:ss] prefix from anchor before comparing,
+                    # then require either anchor-text appears inside actual_line or
+                    # vice versa (LLM sometimes truncates the line).
+                    anchor_text = anchor
+                    if anchor_text.startswith("["):
+                        rb = anchor_text.find("]")
+                        if rb != -1:
+                            anchor_text = anchor_text[rb + 1:].strip()
+                    needle = anchor_text[:40].lower()
+                    haystack = actual_line.lower()
+                    anchor_ok = bool(needle) and (needle in haystack or haystack[:40] in anchor_text.lower())
+                    if not anchor_ok:
+                        # Last-chance: at least the title's first word should appear
+                        # in the actual line (covers paraphrased anchors).
+                        first_word = title.split()[0].lower() if title else ""
+                        if first_word and len(first_word) >= 4 and first_word in haystack:
+                            anchor_ok = True
+
+                if not anchor_ok:
+                    logger.warning(
+                        "USER-INSTRUCTION: dropped clip — anchor mismatch (start=%ss, title=%r, anchor=%r, actual=%r)",
+                        start_s, title[:40], anchor[:60], (actual_line or "")[:60],
+                    )
+                    continue
+                # Strip internal field before returning.
+                h.pop("_anchor", None)
+                validated.append(h)
+            if len(validated) < len(results):
+                logger.info(
+                    "USER-INSTRUCTION: anchor validation kept %d/%d clips",
+                    len(validated), len(results),
+                )
+            results = validated
 
         if exclude_ranges and results:
             results = [
@@ -463,15 +510,52 @@ class HighlightFinder:
                 )
             ]
 
-        seen: set[tuple[float, float]] = set()
+        # Deduplicate: two clips are considered duplicates when their starts are
+        # within 30 s of each other (the LLM sometimes anchors every entity to the
+        # same timestamp with only slightly different ends). Keep the highest viral_score.
         deduped: list[dict] = []
-        for h in results:
-            key = (round(h.get("start", 0), 1), round(h.get("end", 0), 1))
-            if key not in seen:
-                seen.add(key)
+        for h in sorted(results, key=lambda x: x.get("viral_score", 0), reverse=True):
+            h_start = h.get("start", 0)
+            if not any(abs(h_start - kept.get("start", 0)) < 30 for kept in deduped):
                 deduped.append(h)
 
         deduped.sort(key=lambda r: r.get("start", 0))
+        if len(deduped) < len(results):
+            logger.warning(
+                "USER-INSTRUCTION: dropped %d near-duplicate start(s) (kept %d)",
+                len(results) - len(deduped), len(deduped),
+            )
+
+        # Trim clip ends to prevent overlapping content between adjacent clips.
+        # After sorting by start, cap each clip's end at the next clip's start.
+        # Remove any clip whose duration falls below MIN_CLIP_DURATION after trimming.
+        MIN_CLIP_DURATION = 30
+        trimmed: list[dict] = []
+        for i, clip in enumerate(deduped):
+            end = clip.get("end", 0)
+            if i + 1 < len(deduped):
+                next_start = deduped[i + 1].get("start", 0)
+                if end > next_start:
+                    logger.debug(
+                        "Trim clip %d: end %.0fs → %.0fs (next clip starts at %.0fs)",
+                        i + 1, end, next_start, next_start,
+                    )
+                    end = next_start
+            duration = end - clip.get("start", 0)
+            if duration >= MIN_CLIP_DURATION:
+                trimmed.append({**clip, "end": end})
+            else:
+                logger.warning(
+                    "Removed clip too short after overlap trim: %.0fs–%.0fs (%.0fs)",
+                    clip.get("start", 0), end, duration,
+                )
+        if len(trimmed) < len(deduped):
+            logger.warning(
+                "USER-INSTRUCTION: removed %d clips after overlap trim (kept %d)",
+                len(deduped) - len(trimmed), len(trimmed),
+            )
+        deduped = trimmed
+
         logger.info("USER-INSTRUCTION: %d highlights in %.1fs", len(deduped), time.perf_counter() - t0)
         return deduped
 

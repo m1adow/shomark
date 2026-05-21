@@ -52,8 +52,12 @@ class LLMClient:
         return raw
 
     def generate_json_array(self, prompt: str, temperature: float = 0.1, num_ctx: int | None = None) -> list[dict]:
-        """Send a prompt and extract a JSON array from the response."""
-        raw = self.generate(prompt, temperature, think=False, num_ctx=num_ctx)
+        """Send a prompt and extract a JSON array from the response.
+
+        Always uses num_predict=-1 (unlimited) so the array is never truncated
+        mid-element regardless of the OLLAMA_NUM_PREDICT config value.
+        """
+        raw = self.generate(prompt, temperature, num_predict=-1, think=False, num_ctx=num_ctx)
 
         # With format:json Ollama returns clean JSON — try full parse first.
         try:
@@ -70,39 +74,72 @@ class LLMClient:
 
         # Fallback: extract the [...] substring (handles markdown code blocks).
         start_idx = raw.find("[")
-        end_idx = raw.rfind("]") + 1
-        if start_idx == -1 or end_idx == 0:
+        # rfind a closing bracket; if the response was truncated mid-string,
+        # this will be -1 and we drop to the salvage path below.
+        end_bracket = raw.rfind("]")
+        if start_idx == -1:
             logger.warning("No JSON array found in LLM response (first 300 chars): %s", raw[:300])
             return []
-        json_str = raw[start_idx:end_idx]
-        try:
-            return json.loads(json_str)
-        except json.JSONDecodeError:
-            pass
-
-        # Repair common model formatting issues and retry.
-        repaired = re.sub(r"//[^\n]*", "", json_str)       # strip JS-style // comments
-        repaired = re.sub(r",\s*([}\]])", r"\1", repaired)  # remove trailing commas
-        try:
-            return json.loads(repaired)
-        except json.JSONDecodeError:
-            pass
-
-        # Last resort: truncate to the last complete object.
-        last_close = repaired.rfind("}")
-        if last_close != -1:
-            truncated = repaired[:last_close + 1] + "]"
+        if end_bracket != -1:
+            json_str = raw[start_idx:end_bracket + 1]
             try:
-                result = json.loads(truncated)
-                if isinstance(result, list):
-                    logger.warning("JSON truncated to %d complete objects", len(result))
-                    return result
+                return json.loads(json_str)
             except json.JSONDecodeError:
                 pass
 
-        logger.error("Failed to parse JSON from LLM response: %s", json_str[:300])
-        return []
+            # Repair common model formatting issues and retry.
+            repaired = re.sub(r"//[^\n]*", "", json_str)       # strip JS-style // comments
+            repaired = re.sub(r",\s*([}\]])", r"\1", repaired)  # remove trailing commas
+            try:
+                return json.loads(repaired)
+            except json.JSONDecodeError:
+                pass
+        else:
+            repaired = raw[start_idx:]  # no closing bracket — response was truncated
 
+        # Salvage path: response was truncated (most often because num_ctx ran
+        # out mid-object). Keep all complete `{…}` objects up to the last one
+        # that parses cleanly, drop the partial trailing object, close the array.
+        salvaged: list[dict] = []
+        depth = 0
+        obj_start = -1
+        in_string = False
+        escape = False
+        for i, ch in enumerate(repaired):
+            if escape:
+                escape = False
+                continue
+            if ch == "\\" and in_string:
+                escape = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == "{":
+                if depth == 0:
+                    obj_start = i
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0 and obj_start != -1:
+                    candidate = repaired[obj_start:i + 1]
+                    # strip trailing commas inside the candidate too
+                    candidate = re.sub(r",\s*([}\]])", r"\1", candidate)
+                    try:
+                        salvaged.append(json.loads(candidate))
+                    except json.JSONDecodeError:
+                        pass
+                    obj_start = -1
+        if salvaged:
+            logger.warning(
+                "JSON salvaged %d complete object(s) from truncated/malformed response",
+                len(salvaged),
+            )
+            return salvaged
+
+        logger.error("Failed to parse JSON from LLM response: %s", raw[start_idx:start_idx + 300])
     def summarize(self, segments: list[dict]) -> str:
         """Generate a concise Ukrainian summary of the video transcript via LLM.
 
