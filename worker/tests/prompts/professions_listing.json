@@ -1,0 +1,26 @@
+{
+  "_comment": "User-instruction count-test fixture: transcript explicitly mentions 4 distinct IT professions in separate blocks. The instruction asks for a clip per profession — the eval expects exactly 4 clips.",
+  "audience": "Professionals",
+  "description": "Зроби окремий кліп на кожну IT-професію, що згадана у транскрипті.",
+  "additional_instructions": null,
+  "segments": [
+    {"start": 0.0,   "end": 8.0,   "text": "Сьогодні поговоримо про чотири популярні IT-професії, що шукають у 2026 році."},
+    {"start": 8.0,   "end": 22.0,  "text": "Перша — Frontend-розробник. Це людина, яка пише інтерфейси на React, Next.js та TypeScript."},
+    {"start": 22.0,  "end": 38.0,  "text": "Frontend-розробник в Україні має середню зарплату 1800 доларів і працює переважно віддалено."},
+    {"start": 38.0,  "end": 52.0,  "text": "Друга професія — DevOps-інженер. Він автоматизує деплой і налаштовує Kubernetes, Terraform, CI/CD пайплайни."},
+    {"start": 52.0,  "end": 68.0,  "text": "DevOps-інженер з трьома роками досвіду заробляє від 3000 доларів і вище, попит постійно зростає."},
+    {"start": 68.0,  "end": 82.0,  "text": "Третя — Data Engineer. Будує сховища даних на Snowflake, ETL-процеси на Airflow."},
+    {"start": 82.0,  "end": 96.0,  "text": "Data Engineer тісно співпрацює з аналітиками і Data Science командами, потрібен у фінтеху та e-commerce."},
+    {"start": 96.0,  "end": 112.0, "text": "Четверта — QA Automation. Пише тести на Playwright, Selenium, JUnit, інтегрує їх у CI."},
+    {"start": 112.0, "end": 128.0, "text": "QA Automation — чудовий вхід у IT для людей з технічним складом розуму, але без досвіду програмування."},
+    {"start": 128.0, "end": 135.0, "text": "Це лише чотири з десятків напрямків, але вони задають базу для подальшого росту."}
+  ],
+  "expected": {
+    "min_count": 3,
+    "max_count": 4,
+    "forbid_starts_below": 5.0,
+    "min_pairwise_start_gap": 25.0,
+    "title_must_match_one_per_clip": ["frontend", "devops", "data engineer", "qa"],
+    "viral_score_min_stdev": 0.0
+  }
+}

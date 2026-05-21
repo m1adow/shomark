@@ -100,3 +100,60 @@ Expected response contains a `"response"` field with the generated text.
 | Request format | `format: "json"` (enforced by worker — valid JSON output, no markdown wrapping) |
 | Max output tokens | `OLLAMA_NUM_PREDICT=1024` (configurable) |
 | HTTP timeout | `OLLAMA_TIMEOUT=300` seconds (configurable) |
+
+## 6. Highlight-Detection Prompt Rubric
+
+The worker has two prompt branches in `worker/highlight_finder.py`:
+
+- **Map-Reduce** (`_build_map_prompt` + `_build_reduce_prompt`) — runs when the user does **not** supply a `description`. Splits the transcript into `MAP_CHUNKS` parallel chunks, the LLM finds 2 candidates per chunk, then a reduce step picks the top `TOP_HIGHLIGHTS`.
+- **User-Instruction** (`_find_highlights_two_pass`) — runs when the user supplies a `description` (e.g. "make a clip per profession"). One LLM call over the full transcript, with a step-1 mental entity list and `_anchor` self-citation.
+
+Both prompts enforce the same quality rubric:
+
+### Output schema (unchanged across both branches)
+
+```json
+{
+  "start": 1936,
+  "end": 2037,
+  "title": "Стипендія 8000 грн для першокурсників ФІТ",
+  "reason": "Приваблює абітурієнтів конкретною сумою фінансової підтримки на старті.",
+  "viral_score": 0.9,
+  "hashtags": "#ФІТ #стипендія8000 #першокурсник #абітурієнт2026"
+}
+```
+
+### Field-quality rules baked into the prompts
+
+| Field | Rule |
+|---|---|
+| `start` | Must equal a real segment's start time (no arithmetic). For user-instruction branch: validated post-hoc via `_anchor` substring match against the transcript line at that timestamp; mismatched clips are dropped. |
+| `end` | Must equal a real segment's end time. Duration `end - start` ∈ `[clip_duration − 10, clip_duration + 15]` for map-reduce; `[30, 180]` for user-instruction. |
+| `title` | Ukrainian noun phrase ≤ 8 words, must reference a concrete fact (number, proper noun, programme, technology). Banned regex: `^(цікав|захопл|важлив|корисн|ключов)\s`. |
+| `reason` | 1–2 Ukrainian sentences, must start with an audience-benefit verb (`Приваблює…`, `Демонструє…`, `Мотивує…`) and cite a concrete fact from the clip. |
+| `viral_score` | Anchored rubric: **0.9+** named achievement / concrete number / proper noun · **0.7** emotional but generic · **0.5** informative but flat · **<0.5** filler. Score spread across the final set is required (no flat 0.8 bias). |
+| `hashtags` | 3–5 Ukrainian hashtags. **At least 2** must be proper nouns from the clip (technology, programme, name). Pure-generic sets like `#навчання #університет #освіта` are banned. |
+
+### Diversity & gap rules
+
+- **Map-Reduce reduce step**: no two final clips may share the title's first noun (forces topical variety).
+- **User-Instruction**: minimum 30 s gap between any two `start` values, enforced both inside the prompt and post-hoc; near-duplicates resolve to the higher `viral_score`.
+- **Overlap trim**: after sorting by `start`, each clip's `end` is capped at the next clip's `start`; clips shorter than 30 s after trimming are dropped.
+
+### `_anchor` self-citation (user-instruction branch only)
+
+The LLM must include an internal `_anchor` field — the exact `[mm:ss] line text…` from the transcript at the clip's `start`. The worker validates that the anchor's text is a substring (case-insensitive, first 40 chars) of the actual transcript line at that timestamp; clips that fail the check are discarded. The field is stripped from the final result so it never reaches downstream consumers.
+
+### Eval harness
+
+Located at `worker/tests/test_prompt_eval.py` with golden fixtures under `worker/tests/prompts/*.json`. Skipped unless `OLLAMA_URL` is set, so it stays out of normal CI:
+
+```powershell
+$env:OLLAMA_URL="http://localhost:11434/api/generate"
+$env:OLLAMA_MODEL="gemma4:e4b"
+$env:KAFKA_BOOTSTRAP_SERVERS="dummy"
+$env:MINIO_ENDPOINT="dummy"; $env:MINIO_ACCESS_KEY="dummy"; $env:MINIO_SECRET_KEY="dummy"
+pytest worker/tests/test_prompt_eval.py -v -s
+```
+
+Each fixture asserts: count window, `start` grounded ±2 s to a real segment, no overlaps, no `start` below the configured floor, Cyrillic-only fields, no banned-boilerplate titles, `viral_score` spread, and entity coverage where applicable.
